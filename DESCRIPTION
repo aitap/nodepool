@@ -4,9 +4,8 @@ Title: Dynamically Distribute Tasks Between Computational Nodes
 Version: 0.1
 Date: 2023-04-26
 Authors@R: c(person('Ivan', 'Krylov', role = c('aut', 'cre'), email =
- 'krylov.r00t@gmail.com'), person('R Core Team', role = 'cph',
- comment = 'Parts of the run_node function taken from
- parallel:::workCommand'))
+ 'krylov.r00t@gmail.com'), person('R Core Team', role = 'cph', comment =
+ 'Parts of the run_node function taken from parallel:::workCommand'))
 Description: The pool behaves like an ad-hoc 'parallel' cluster, but the
  nodes can leave and re-join the cluster later. A task abandoned by a
  node without completing it is reassigned to a different node.
