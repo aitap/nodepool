@@ -1,0 +1,24 @@
+Client1: box rad .1 "client"
+MidClient: move
+Client2: box rad .1 "client"
+move down from MidClient
+
+Pool: box "pool"; move
+
+Node1: oval "node"
+move left from Node1; move 50%
+Node2: oval "node"
+move right from Node1; move 50%
+Node3: oval "node"
+
+arrow from Client1.e rad 1 \
+	right until even with Pool \
+	then to Pool.n
+arrow from Client2.w rad 1 \
+	right until even with Pool \
+	then to Pool.n
+"tasks" with .s at MidClient.n
+
+arrow from Pool.s to Node1.n
+arrow from Pool.s to Node2.n
+arrow from Pool.s to Node3.n "tasks" ljust above

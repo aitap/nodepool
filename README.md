@@ -8,6 +8,15 @@ What is this?
 similar to R's built-in `parallel` clusters, except that it can
 dynamically grow and shrink.
 
+The pool is a TCP server to which clients and nodes can connect. Clients
+send computational tasks to the pool for the nodes to evaluate; the
+nodes send the results and the pool forwards them back to the clients.
+
+![Top to bottom, there are boxes labelled "client", a single box
+labelled "pool" and more boxes labelled "node". Arrows labelled "tasks"
+go from the "clients" to the "pool", then from the "pool" to the
+"nodes".](man/figures/architecture.svg)
+
 How can I use it?
 -----------------
 
