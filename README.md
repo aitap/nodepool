@@ -28,7 +28,7 @@ using `12345` here.
 Mind that there's currently no security, so don't start this on a
 publicly available connection; instead use [SSH tunnels]. Every node and
 client will need to make outbound connections to the pool machine, but
-there is no need for cliends or nodes to be able to talk to each other;
+there is no need for clients or nodes to be able to talk to each other;
 neither there is any need for the pool machine to be able to connect
 back to the clients or the nodes.
 
