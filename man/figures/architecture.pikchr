@@ -3,7 +3,7 @@ MidClient: move
 Client2: box rad .1 "client"
 move down from MidClient
 
-Pool: box "pool"; move
+Pool: box "pool" "server"; move
 
 Node1: oval "node"
 move left from Node1; move 50%
