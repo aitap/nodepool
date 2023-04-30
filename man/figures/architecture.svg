@@ -4,7 +4,8 @@
 <path d="M304.56,74.16L383.76,74.16A14.4 14.4 0 0 0 398.16 59.76L398.16,16.56A14.4 14.4 0 0 0 383.76 2.16L304.56,2.16A14.4 14.4 0 0 0 290.16 16.56L290.16,59.76A14.4 14.4 0 0 0 304.56 74.16Z"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
 <text x="344.16" y="38.16" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">client</text>
 <path d="M200.16,182.16L308.16,182.16L308.16,110.16L200.16,110.16Z"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
-<text x="254.16" y="146.16" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">pool</text>
+<text x="254.16" y="136.08" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">pool</text>
+<text x="254.16" y="156.24" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">server</text>
 <path d="M218.16,326.16L290.16,326.16A36 36 0 0 0 326.16 290.16A36 36 0 0 0 290.16 254.16L218.16,254.16A36 36 0 0 0 182.16 290.16A36 36 0 0 0 218.16 326.16Z"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
 <text x="254.16" y="290.16" text-anchor="middle" fill="rgb(0,0,0)" dominant-baseline="central">node</text>
 <path d="M38.16,326.16L110.16,326.16A36 36 0 0 0 146.16 290.16A36 36 0 0 0 110.16 254.16L38.16,254.16A36 36 0 0 0 2.16 290.16A36 36 0 0 0 38.16 326.16Z"  style="fill:none;stroke-width:2.16;stroke:rgb(0,0,0);" />
