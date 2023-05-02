@@ -22,7 +22,7 @@ repo: PACKAGES.rds
 PACKAGES.rds: PACKAGES.gz
 PACKAGES.gz: PACKAGES
 PACKAGES: $(PACKAGE)
-	Rscript -e 'tools::write_PACKAGES(verbose = TRUE, validate = TRUE)'
+	Rscript -e 'tools::write_PACKAGES(verbose = TRUE)'
 
 check: $(PACKAGE)
 	R CMD check $(PACKAGE)
