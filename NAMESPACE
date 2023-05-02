@@ -5,4 +5,5 @@ export(pool_connect, lbapply)
 export(run_node)
 
 # pool.R
+importFrom(methods, new)
 export(run_pool)
