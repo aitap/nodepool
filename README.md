@@ -18,9 +18,16 @@ go from the "clients" to the "pool server", then from the "pool" to the
 "nodes".](man/figures/architecture.svg)
 
 Installation
------------------
+------------
 
-You can install `nodepool` from GitHub using the `remotes` package.
+You can install the package from the private repo:
+
+```
+install.packages('nodepool', contriburl='https://aitap.github.io/nodepool-releases')
+```
+
+Alternatively, you can install `nodepool` from GitHub using the `remotes`
+package.
 
 ```
 remotes::install_github("aitap/nodepool")
