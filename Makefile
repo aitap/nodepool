@@ -5,7 +5,7 @@ PACKAGE = $(shell Rscript -e "\
 
 all: piks $(PACKAGE)
 
-.PHONY: all piks repo
+.PHONY: all piks repo check
 .SUFFIXES: .pikchr .svg
 
 PIKS = man/figures/architecture.pikchr
@@ -23,3 +23,6 @@ PACKAGES.rds: PACKAGES.gz
 PACKAGES.gz: PACKAGES
 PACKAGES: $(PACKAGE)
 	Rscript -e 'tools::write_PACKAGES(verbose = TRUE, validate = TRUE)'
+
+check: $(PACKAGE)
+	R CMD check $(PACKAGE)
