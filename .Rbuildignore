@@ -1,2 +1,3 @@
-\\.pikchr$
+\.pikchr$
 ^Makefile$
+^\.
