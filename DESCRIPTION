@@ -1,7 +1,7 @@
 Package: nodepool
 Type: Package
 Title: Dynamically Distribute Tasks Between Computational Nodes
-Version: 0.1
+Version: 0.1.0.9999
 Date: 2023-04-26
 Authors@R: c(person('Ivan', 'Krylov', role = c('aut', 'cre'), email =
  'krylov.r00t@gmail.com'), person('R Core Team', role = 'cph', comment =
