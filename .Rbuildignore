@@ -1,3 +1,5 @@
 \.pikchr$
 ^Makefile$
 ^\.
+\.tar\.gz$
+^PACKAGES
