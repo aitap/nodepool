@@ -10,9 +10,9 @@
 
   Use \code{\link{run_pool}(\var{port})} to start a pool on a given
   port. In order to send tasks to the pool, use
-  \code{pool_connect(\var{host}, \var{port})} to create a
+  \code{\link{pool_connect}(\var{host}, \var{port})} to create a
   connection object (make sure to \code{\link{close}} it when done),
-  then run \code{lblapply(\var{list}, \var{fun}, \var{conn})} to
+  then run \code{\link{lbapply}(\var{list}, \var{fun}, \var{conn})} to
   submit the tasks. In order to run the tasks, use
   \code{\link{run_node}(\var{host}, \var{port})} in a new R process.
 
@@ -22,7 +22,7 @@
 % TODO:\references{}
 \keyword{package}
 \seealso{
-%  \code{\link{pool_connect}}, \code{\link{lbapply}},
+  \code{\link{pool_connect}}, \code{\link{lbapply}},
   \code{\link{run_node}}, \code{\link{run_pool}}
 }
 % TODO: real examples
@@ -38,6 +38,6 @@
   \dontrun{
     # In a third R process do:
     p <- pool_connect('localhost', 12345)
-    lblapply(1:10, sin, p)
+    lbapply(1:10, sin, p)
   }
 }

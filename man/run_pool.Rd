@@ -27,8 +27,8 @@
 %TODO: \references{}
 
 \seealso{
-  \code{\link{run_node}} for actually running the tasks%,
-  %\code{\link{lbapply}} for the only client for now
+  \code{\link{run_node}} for actually running the tasks,
+  \code{\link{lbapply}} for the only client for now
 }
 \examples{\dontrun{run_pool(12345)}}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
