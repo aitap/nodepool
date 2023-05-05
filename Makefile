@@ -18,11 +18,5 @@ PIKCHR = pikchr
 $(PACKAGE): R/* man/* man/*/* DESCRIPTION NAMESPACE .Rbuildignore README.md
 	R CMD build .
 
-repo: PACKAGES.rds
-PACKAGES.rds: PACKAGES.gz
-PACKAGES.gz: PACKAGES
-PACKAGES: $(PACKAGE)
-	Rscript -e 'tools::write_PACKAGES(verbose = TRUE)'
-
 check: $(PACKAGE)
 	R CMD check $(PACKAGE)
