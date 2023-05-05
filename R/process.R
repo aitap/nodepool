@@ -1,10 +1,17 @@
+# Here's the problem: we'd like to
+# (1) Run a child Rscript process
+# (2) Know if it terminates
+# (3) Tell it to terminate, letting it clean up
+# We can't (just) use a PID because it will be reused from under us. We
+# need some kind of handle that will let us know when the process
+# terminates *and* can be used to request termination.
 startRscript <- function() {
 	# NOTE: on Windows, this becomes a named pipe under \\.\pipe\, so
 	# must unlink it once done
 	path <- tempfile()
 
 	bootstrap <- bquote(
-		# the act of opening the FIFO acts as synchronisation
+		# opening the FIFO acts as synchronisation
 		f <- fifo(.(path), 'r', TRUE)
 	)
 
