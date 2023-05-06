@@ -4,10 +4,13 @@ mPool <- setRefClass('Pool',
 	fields = list(
 		server = 'Connection',
 		port = 'integer', # for informational purposes only
+
 		clients = 'list', # actually list<ClientConnection>
 		nodes = 'list',   # actually list<NodeConnection>
-		tasks = 'list'    # actually list<Task>
-		# actually would like them to be mutable
+		tasks = 'list',    # actually list<Task>
+		# would like these to be mutable
+
+		running = 'logical'
 	),
 	methods = list(
 		initialize = function(port) {
@@ -24,6 +27,7 @@ mPool <- setRefClass('Pool',
 			.self$clients <- list()
 			.self$nodes <- list()
 			.self$tasks <- list()
+			.self$running <- TRUE
 		},
 		show = function() cat(
 			'<Pool(port=', port, '): ',
@@ -75,7 +79,11 @@ mPool <- setRefClass('Pool',
 			client$socket <- NULL
 			remove_client(client)
 			.self$nodes <- c(nodes, list(mNodeConnection(sock, .self)))
-		}
+		},
+		halt = function() {
+			.self$running <- FALSE
+		},
+		run = function() while (running) process_one_event()
 	)
 )
 mPool$lock(c('port', 'server'))
@@ -145,9 +153,8 @@ mClientConnection <- setRefClass('ClientConnection',
 						tag = msg$data$tag,
 						payload = msg
 					)),
-					NODE = {
-						pool$make_node(.self)
-					}
+					NODE = pool$make_node(.self),
+					HALT = pool$halt()
 					# TODO: accept serialize() version
 				)
 			},
@@ -202,7 +209,4 @@ mNodeConnection <- setRefClass('NodeConnection',
 	)
 )
 
-run_pool <- function(port) {
-	p <- mPool(port)
-	repeat p$process_one_event()
-}
+run_pool <- function(port) mPool(port)$run()
