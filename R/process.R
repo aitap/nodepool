@@ -1,27 +1,33 @@
-# Here's the problem: we'd like to
-# (1) Run a child Rscript process
-# (2) Know if it terminates
-# (3) Tell it to terminate, letting it clean up
-# We can't (just) use a PID because it will be reused from under us. We
-# need some kind of handle that will let us know when the process
-# terminates *and* can be used to request termination.
-startRscript <- function() {
-	# NOTE: on Windows, this becomes a named pipe under \\.\pipe\, so
-	# must unlink it once done
-	path <- tempfile()
+# Start an Rscript process in the background and have it run a given
+# expression. Cannot even return the PID, though it's mostly useless
+# without a guarantee that it belongs to the same process.
+Rscript <- function(expr) system2(
+	file.path(R.home('bin'), 'Rscript'),
+	c('-e', shQuote(paste(deparse(expr), collapse = '\n'))),
+	wait = FALSE
+)
 
-	bootstrap <- bquote(
-		# opening the FIFO acts as synchronisation
-		f <- fifo(.(path), 'r', TRUE)
-	)
+# Start a background Rscript but have it return a value to the parent
+# process, blocking until it's returned.
+Rscript_payload <- function(value, continue) {
+	# How to receive a piece of information from a background Rscript
+	# and have it continue? Well...
+	# We can't use pipe() (which is implemented using popen()) because
+	# pclose() will wait until the child process terminates and we don't
+	# want that. (Keeping the connection open is not worth the hassle.)
+	# What we can do is pre-arrange to use a temporary named pipe.
 
-	cmdline <- paste(
-		shQuote(file.path(R.home('bin'), 'Rscript')),
-		'-e',
-		shQuote(paste(deparse(bootstrap), collapse = ' ')),
-		'-e',
-		shQuote('Sys.sleep(19)')
-	)
+	path <- tempfile('Rscriptfifo')
+	# FIXME: does unlink() even work for named pipes on Windows?
+	on.exit(unlink(path), add = TRUE)
+
+	payload <- substitute({
+		f <- fifo(path, 'w', TRUE)
+		serialize(value, f, TRUE)
+		close(f)
+		continue
+	}, list(path = path, value = value, continue = continue))
+
 	# So.
 	# There is no function to create the FIFO, but R will do that for us
 	# if opening a connection for writing.
@@ -29,26 +35,16 @@ startRscript <- function() {
 	# there's already a reader, and O_NONBLOCK|O_RDWR is undefined;
 	# opening without O_NONBLOCK will block until both ends are
 	# connected.
-	# (What about Windows? No idea.)
-	# We can't afford to block before the process is launched, so here's
-	# a workaround:
+	# On Windows, the fifo() implementation had significant bugs until
+	# R-4.1.0: opening a non-existent fifo would crash R, and binary
+	# mode was ignored.
+
 	# (1) create a pipe but fail to open it
 	try(suppressWarnings(close(fifo(path, 'w', FALSE))), TRUE)
 	# (2) now that it exists, launch a child process
-	# (note: pipes are always blocking, and so may be close())
-	p <- pipe(cmdline, 'r')
-	# (3) now it's safe for both processes to try opening the FIFO and
-	# blocking for a bit
-	f <- fifo(path, 'w', TRUE)
-	list(
-		path = path,
-		pipe = p,
-		fifo = f
-	)
-	# now, we "just" need (1) a way to check whether a pipe/FIFO is
-	# readable/writable without blocking and (2) very preferrably, a way
-	# for the child to monitor it being closed (and terminating, like on
-	# EOF). tools::pskill is a tool of last resort because it uses
-	# TerminateProcess and won't let R clean up
-	# may have to use Tcl event loop?
+	Rscript(payload)
+	# (3) now it's safe for both processes to open the FIFO
+	f <- fifo(path, 'r', TRUE)
+	on.exit(close(f), add = TRUE)
+	unserialize(f)
 }
