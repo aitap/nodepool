@@ -3,7 +3,7 @@ setClass('Connection')
 mPool <- setRefClass('Pool',
 	fields = list(
 		server = 'Connection',
-		port = 'integer', # for informational purposes only
+		portnum = 'integer',
 
 		clients = 'list', # actually list<ClientConnection>
 		nodes = 'list',   # actually list<NodeConnection>
@@ -13,27 +13,35 @@ mPool <- setRefClass('Pool',
 		running = 'logical'
 	),
 	methods = list(
+		listen = function(port) {
+			if (missing(port)) repeat {
+				# must guess a working port
+				port <- floor(runif(1, 1024, 65536))
+				socket <- try(serverSocket(port), TRUE)
+				if (!inherits(socket, 'try-error')) break
+			} else {
+				stopifnot(
+					is.numeric(port), length(port) == 1, port == round(port),
+					port > 0, port < 65536
+				)
+				socket <- serverSocket(port)
+			}
+			.self$portnum <- as.integer(port)
+			.self$server <- mServerConnection(socket = socket, pool = .self)
+		},
 		initialize = function(port) {
-			stopifnot(
-				is.numeric(port), length(port) == 1, port == round(port),
-				port > 0, port < 65536
-			)
-			.self$port <- as.integer(port)
-			.self$server <- mServerConnection(
-				socket = serverSocket(.self$port),
-				pool = .self
-			)
-
+			listen(port)
 			.self$clients <- list()
 			.self$nodes <- list()
 			.self$tasks <- list()
 			.self$running <- TRUE
 		},
 		show = function() cat(
-			'<Pool(port=', port, '): ',
+			'<Pool(port=', portnum, '): ',
 			length(clients), ' client(s), ',
 			length(nodes),   ' node(s), ',
-			length(tasks), ' task(s)',
+			length(tasks), ' task(s), ',
+			if (running) 'running' else 'STOPPED',
 			'>\n', sep = ''
 		),
 		process_one_event = function() {
@@ -86,7 +94,7 @@ mPool <- setRefClass('Pool',
 		run = function() while (running) process_one_event()
 	)
 )
-mPool$lock(c('port', 'server'))
+mPool$lock(c('portnum', 'server'))
 
 setOldClass(c('servsockconn', 'sockconn'))
 setClassUnion('optional_sockconn', c('servsockconn', 'sockconn', 'NULL'))
@@ -209,4 +217,4 @@ mNodeConnection <- setRefClass('NodeConnection',
 	)
 )
 
-run_pool <- function(port) mPool(port)$run()
+run_pool <- function(port) mPool(force(port))$run()
