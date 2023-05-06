@@ -1,4 +1,4 @@
-run_node <- function(host, port) {
+.run_node <- function(host, port) {
 	socket <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
 	on.exit(close(socket), add = TRUE)
 
@@ -13,6 +13,8 @@ run_node <- function(host, port) {
 	.libPaths(lbr)
 	on.exit(.libPaths(oldlib), add = TRUE)
 
+	# FIXME: can we make an empty environment that's otherwise just like
+	# the global environment and run the tasks there?
 	env <- new.env(parent = loadNamespace('base'))
 
 	serialize(list(type = 'NODE'), socket)
@@ -47,4 +49,19 @@ run_node <- function(host, port) {
 		)
 		rm(msg)
 	}
+}
+
+run_node <- function(host, port, background = FALSE) {
+	if (!background) return(.run_node(host, port))
+
+	ret <- Rscript_payload(
+		quote(Sys.getpid()),
+		bquote(nodepool::run_node(.(host), .(port), FALSE))
+	)
+	structure(ret, class = 'run_node')
+}
+
+print.run_node <- function(x, ...) {
+	stopifnot(length(list(...)) == 0)
+	cat('Node started on PID', x, '\n')
 }
