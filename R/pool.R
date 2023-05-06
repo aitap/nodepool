@@ -217,9 +217,16 @@ mNodeConnection <- setRefClass('NodeConnection',
 	)
 )
 
-run_pool <- function(port) mPool(port)$run()
+run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
+	stopifnot(length(nodes) == 1, nodes == round(nodes))
 
-run_pool_background <- function(port = NULL) {
+	if (!background) {
+		stopifnot(!is.null(port))
+		pool <- mPool(port)
+		for (i in seq_len(nodes)) run_node('localhost', port, TRUE)
+		return(pool$run())
+	}
+
 	ret <- Rscript_payload(
 		bquote({
 			p <- nodepool:::mPool(.(port))
@@ -227,14 +234,21 @@ run_pool_background <- function(port = NULL) {
 		}),
 		quote(p$run())
 	)
+	nodes <- replicate(nodes, run_node('localhost', ret[1], TRUE), FALSE)
 	structure(
 		as.integer(ret[1]),
-		class = 'run_pool_background',
-		pid = ret[2]
+		class = 'run_pool',
+		pid = ret[2],
+		nodepids = nodes
 	)
 }
 
-print.run_pool_background <- function(x, ...) {
+print.run_pool <- function(x, ...) {
 	stopifnot(length(list(...)) == 0)
-	cat("Pool started on TCP port ", x, " (PID ", attr(x, 'pid'), ')\n', sep = '')
+	cat(
+		'Pool started on TCP port ', x, ' (PID ', attr(x, 'pid'), ')',
+		if ((l <- length(attr(x, 'nodepids'))) > 0)
+			' with ', l, ' local nodes included',
+		'\n', sep = ''
+	)
 }

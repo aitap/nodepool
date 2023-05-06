@@ -7,5 +7,5 @@ S3method(print, run_node)
 
 # pool.R
 importFrom(methods, new)
-export(run_pool, run_pool_background)
-S3method(print, run_pool_background)
+export(run_pool)
+S3method(print, run_pool)

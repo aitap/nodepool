@@ -1,7 +1,6 @@
 \name{run_pool}
 \alias{run_pool}
-\alias{run_pool_background}
-\alias{print.run_pool_background}
+\alias{print.run_pool}
 \title{Run a pool server}
 \description{
   This function starts a TCP server on a given port for the clients and
@@ -10,22 +9,29 @@
   them back.
 }
 \usage{
-  run_pool(port)
-  run_pool_background(port = NULL)
-  \method{print}{run_pool_background}(x, \dots)
+  run_pool(port = NULL, background = FALSE, nodes = 0)
+  \method{print}{run_pool}(x, \dots)
 }
 \arguments{
   \item{port}{
     A whole number in \eqn{[1, 65535]} specifying the TCP port number to
-    listen on. May be omitted for \code{run_pool_background}, in which
-    case a free port will be chosen automatically.
+    listen on. May be omitted when starting a background server, in
+    which case a free port will be chosen automatically.
+  }
+  \item{background}{
+    By default, the pool is started in the current R session. Set this
+    argument to \code{TRUE} to run the pool in a background process
+    instead.
+  }
+  \item{nodes}{
+    The number of nodes to automatically launch as background processes
+    to be included in the pool.
   }
   \item{x}{
-    An object returned by \code{run_pool_background}.
+    An object returned by \code{run_pool}.
   }
   \item{\dots}{
-    Extra arguments to \code{print.run_pool_background} are not
-    allowed.
+    Extra arguments to \code{print.run_pool} are not allowed.
   }
 }
 \details{
@@ -43,14 +49,14 @@
 }
 \value{
   \item{\code{run_pool}}{
-    Does not return (enters an infinite loop) but can be safely
-    interrupted.
-  }
-  \item{\code{run_pool_background}}{
-    An integer scalar of class \code{run_pool_background}, signifying
-    the port number (whether it was chosen automatically or not).
-    Additionally, the PID of the \code{Rscript} process is stored in the
-    \code{pid} attribute, but only for informational purposes.
+    When \code{background = FALSE}: does not return (enters an infinite
+    loop) but can be safely interrupted.
+
+    An integer scalar of class \code{run_pool}, signifying the port
+    number (whether it was chosen automatically or not).  Additionally,
+    the PID of the \code{Rscript} process is stored in the \code{pid}
+    attribute and the PIDs of the automatically started nodes are stored
+    in the \code{nodepids} attribute, but only for informational purposes.
   }
 }
 %TODO: \references{}
