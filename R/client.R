@@ -1,5 +1,15 @@
-pool_connect <- function(host, port)
-	socketConnection(host, port, blocking = TRUE, open = 'a+b')
+pool_connect <- function(host, port) {
+	ret <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
+	attr(ret, 'host') <- host
+	attr(ret, 'port') <- port
+	class(ret) <- c('pool_connection', class(ret))
+	ret
+}
+
+pool_halt <- function(pool) {
+	serialize(list(type = 'HALT'), pool)
+	close(pool)
+}
 
 lbapply <- function(x, fun, pool, ...) {
 	for (i in seq_along(x))

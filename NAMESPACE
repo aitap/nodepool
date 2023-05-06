@@ -1,5 +1,5 @@
 # client.R
-export(pool_connect, lbapply)
+export(pool_connect, lbapply, pool_halt)
 
 # node.R
 export(run_node)
