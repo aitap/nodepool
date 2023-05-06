@@ -14,7 +14,7 @@ mPool <- setRefClass('Pool',
 	),
 	methods = list(
 		listen = function(port) {
-			if (missing(port)) repeat {
+			if (is.null(port)) repeat {
 				# must guess a working port
 				port <- floor(runif(1, 1024, 65536))
 				socket <- try(serverSocket(port), TRUE)
@@ -217,4 +217,24 @@ mNodeConnection <- setRefClass('NodeConnection',
 	)
 )
 
-run_pool <- function(port) mPool(force(port))$run()
+run_pool <- function(port) mPool(port)$run()
+
+run_pool_background <- function(port = NULL) {
+	ret <- Rscript_payload(
+		bquote({
+			p <- nodepool:::mPool(.(port))
+			c(p$portnum, Sys.getpid())
+		}),
+		quote(p$run())
+	)
+	structure(
+		as.integer(ret[1]),
+		class = 'run_pool_background',
+		pid = ret[2]
+	)
+}
+
+print.run_pool_background <- function(x, ...) {
+	stopifnot(length(list(...)) == 0)
+	cat("Pool started on TCP port ", x, " (PID ", attr(x, 'pid'), ')\n', sep = '')
+}
