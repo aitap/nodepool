@@ -74,8 +74,7 @@ join the pool at any time as well.
 Anything I should keep in mind?
 -------------------------------
 
-`nodepool` is at a very early stage of development, not even having any
-tests yet.
+`nodepool` is still at an early stage of development.
 
 There are no security measures implemented in `nodepool`. Just like in
 `parallel` clusters, connections are unencrypted and go straight to R's

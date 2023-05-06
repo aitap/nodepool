@@ -15,7 +15,7 @@ PIKCHR = pikchr
 .pikchr.svg:
 	$(PIKCHR) --svg-only $< > $@
 
-$(PACKAGE): R/* man/* man/*/* DESCRIPTION NAMESPACE .Rbuildignore README.md
+$(PACKAGE): . R/* man/* man/*/* tests/* DESCRIPTION NAMESPACE .Rbuildignore README.md
 	R CMD build .
 
 check: $(PACKAGE)
