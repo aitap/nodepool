@@ -10,5 +10,5 @@ Description: The pool behaves like an ad-hoc 'parallel' cluster, but the
  nodes can leave and re-join the cluster later. A task abandoned by a
  node without completing it is reassigned to a different node.
 License: GPL-2 | GPL-3
-Depends: R (>= 4)
+Depends: R (>= 4.0)
 Imports: methods
