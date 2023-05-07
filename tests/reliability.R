@@ -1,13 +1,11 @@
 library(nodepool)
 
+# need a local environment for on.exit
 local({
-	# need a local environment for on.exit
-	port <- run_pool(background = TRUE, nodes = 2)
-	# this is the window where we could leave the pool running if something failed
-	pool <- pool_connect('localhost', port)
+	pool <- run_pool(background = TRUE, nodes = 2)
 	on.exit(pool_halt(pool))
 
-	nodepids <- unlist(attr(port, 'nodepids'))
+	nodepids <- unlist(attr(pool, 'nodepids'))
 	results <- lbapply(2:3, function(x) {
 		pid <- Sys.getpid()
 		if (pid == nodepids[1]) q('no') # simulate a crash
@@ -20,7 +18,7 @@ local({
 		vapply(results, `[[`, 0, 2) == (2:3)^2
 	)
 
-	newnode <- run_node('localhost', port, TRUE)
+	newnode <- run_node('localhost', attr(pool, 'port'), TRUE)
 	eff.pids <- unlist(lbapply(1:2, function(.) {
 		Sys.sleep(.5); Sys.getpid()
 	}, pool))

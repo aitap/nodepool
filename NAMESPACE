@@ -1,5 +1,6 @@
 # client.R
 export(pool_connect, lbapply, pool_halt)
+S3method(print, pool_connection)
 
 # node.R
 export(run_node)
@@ -8,4 +9,3 @@ S3method(print, run_node)
 # pool.R
 importFrom(methods, new)
 export(run_pool)
-S3method(print, run_pool)

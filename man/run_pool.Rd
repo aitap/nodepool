@@ -1,6 +1,5 @@
 \name{run_pool}
 \alias{run_pool}
-\alias{print.run_pool}
 \title{Run a pool server}
 \description{
   This function starts a TCP server on a given port for the clients and
@@ -10,7 +9,6 @@
 }
 \usage{
   run_pool(port = NULL, background = FALSE, nodes = 0)
-  \method{print}{run_pool}(x, \dots)
 }
 \arguments{
   \item{port}{
@@ -27,12 +25,6 @@
     The number of nodes to automatically launch as background processes
     to be included in the pool.
   }
-  \item{x}{
-    An object returned by \code{run_pool}.
-  }
-  \item{\dots}{
-    Extra arguments to \code{print.run_pool} are not allowed.
-  }
 }
 \details{
   Due to the way \code{\link{serverSocket}} currently works, the server
@@ -48,16 +40,14 @@
   \code{\link{pool_halt}()}.
 }
 \value{
-  \item{\code{run_pool}}{
-    When \code{background = FALSE}: does not return (enters an infinite
-    loop) but can be safely interrupted.
+  When \code{background = FALSE}: does not return (enters an infinite
+  loop) but can be safely interrupted.
 
-    An integer scalar of class \code{run_pool}, signifying the port
-    number (whether it was chosen automatically or not).  Additionally,
-    the PID of the \code{Rscript} process is stored in the \code{pid}
-    attribute and the PIDs of the automatically started nodes are stored
-    in the \code{nodepids} attribute, but only for informational purposes.
-  }
+  Otherwise, a \code{pool_connection} object, the same as returned by
+  \code{\link{pool_connect}}. Additionally, the PID of the
+  \code{Rscript} process is stored in the \code{pid} attribute and the
+  PIDs of the automatically started nodes are stored in the
+  \code{nodepids} attribute, but only for informational purposes.
 }
 %TODO: \references{}
 

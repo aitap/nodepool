@@ -1,6 +1,7 @@
 \name{pool_connect}
 \alias{pool_connect}
 \alias{pool_halt}
+\alias{print.pool_connection}
 \title{Connections to a pool}
 \description{
   Establish a TCP connection to a pool that was started using
@@ -9,6 +10,7 @@
 \usage{
   pool_connect(host, port)
   pool_halt(pool)
+  \method{print}{pool_connection}(x, \dots)
 }
 \arguments{
   \item{host}{
@@ -18,8 +20,11 @@
     The TCP port number to connect to, a whole number in
     \eqn{[1, 65535]}.
   }
-  \item{pool}{
+  \item{pool, x}{
     A \code{pool_connection} object returned by \code{pool_connect}.
+  }
+  \item{\dots}{
+    No other arguments to \code{print.pool_connection} are allowed.
   }
 }
 \details{
@@ -33,18 +38,20 @@
 }
 \value{
   \code{pool_connect}: a \code{\link{connection}} object of class
-  \code{pool_connection}.
+  \code{pool_connection}. The attributes \code{host} and \code{port}
+  store the connection information.
 }
 \note{
   This function will probably be rewritten or renamed when a better idea
-  for the API shows up. At the very least, the host and the port need to
-  be remembered in order to re-establish the connection automatically.
+  for the API shows up. At the very least, the connection object will
+  have to become mutable in order to re-establish the connection
+  automatically.
 }
 
 \seealso{\code{\link{lbapply}}}
 \examples{\dontrun{
   pool <- pool_connect('192.2.0.2', 12345)
-  stopCluster(pool)
+  close(pool)
 }}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory (show via RShowDoc("KEYWORDS")):

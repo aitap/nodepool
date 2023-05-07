@@ -247,22 +247,9 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
 		quote(p$run())
 	)
 	nodes <- replicate(nodes, run_node('localhost', ret[1], TRUE), FALSE)
-	# FIXME: why don't we just connect to the pool here?
 	structure(
-		as.integer(ret[1]),
-		class = 'run_pool',
+		pool_connect('localhost', ret[1]),
 		pid = ret[2],
 		nodepids = nodes
 	)
-}
-
-print.run_pool <- function(x, ...) {
-	stopifnot(length(list(...)) == 0)
-	cat(
-		'Pool started on TCP port ', x, ' (PID ', attr(x, 'pid'), ')',
-		if ((l <- length(attr(x, 'nodepids'))) > 0)
-			c(' with ', l, ' local nodes included'),
-		'\n', sep = ''
-	)
-	invisible(x)
 }

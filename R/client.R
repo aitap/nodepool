@@ -11,7 +11,12 @@ print.pool_connection <- function(x, ...) {
 	cat(
 		'<Connection to the pool server at ',
 		attr(x, 'host'), ':', attr(x, 'port'),
-		'>\n'
+		if (!is.null(pid <- attr(x, 'pid'))) paste0(' (PID ', pid, ')'),
+		if ((nodes <- length(attr(x, 'nodepids'))) > 0)
+			paste(' with', nodes, 'local node[s]'),
+		if (inherits(try(isOpen(x), TRUE), 'try-error'))
+			', currently closed',
+		'>\n', sep = ''
 	)
 	invisible(x)
 }
