@@ -26,7 +26,7 @@ lbapply <- function(x, fun, pool, ...) {
 		# to fail with a timeout
 		socketSelect(list(pool))
 		value <- unserialize(pool)
-		if (!value$success) { stop(value$value) }
+		if (!value$success) { warning(value$value) }
 		ret[[value$tag]] <- value$value
 	}
 	ret
