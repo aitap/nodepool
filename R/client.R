@@ -5,6 +5,7 @@ pool_connect <- function(host, port) {
 	class(ret) <- c('pool_connection', class(ret))
 	ret
 }
+# TODO: print.pool_connection
 
 pool_halt <- function(pool) {
 	serialize(list(type = 'HALT'), pool)

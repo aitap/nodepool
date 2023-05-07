@@ -247,6 +247,7 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
 		quote(p$run())
 	)
 	nodes <- replicate(nodes, run_node('localhost', ret[1], TRUE), FALSE)
+	# FIXME: why don't we just connect to the pool here?
 	structure(
 		as.integer(ret[1]),
 		class = 'run_pool',

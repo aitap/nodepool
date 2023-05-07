@@ -22,7 +22,7 @@ Rscript_payload <- function(value, continue) {
 	# R-4.1.0.
 	# Hence... temporary files as IPC!
 
-	path <- tempfile('Rscriptfifo')
+	path <- tempfile('Rscript_payload_rds')
 	on.exit(unlink(path), add = TRUE)
 
 	Rscript(substitute({
