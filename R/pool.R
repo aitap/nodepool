@@ -89,6 +89,15 @@ mPool <- setRefClass('Pool',
 			.self$nodes <- c(nodes, list(mNodeConnection(sock, .self)))
 		},
 		halt = function() {
+			# disconnect the nodes gracefully
+			# TODO: the clients may need a warning too, but (1) they
+			# don't handle it yet and (2) they are the one(s?)
+			# initiating the shutdown, so all but one ought to have
+			# disconnected already.
+			for (node in nodes) try(
+				serialize(list(type = 'HALT'), node$socket),
+				TRUE
+			)
 			.self$running <- FALSE
 		},
 		run = function() while (running) process_one_event()
@@ -163,7 +172,10 @@ mClientConnection <- setRefClass('ClientConnection',
 					)),
 					NODE = pool$make_node(.self),
 					HALT = pool$halt()
-					# TODO: accept serialize() version
+					# TODO: accept serialize() version. The server won't
+					# run on R<4, but the clients/nodes don't depend on
+					# anything modern. We'll have to handle this
+					# gracefully before we attempt to start up, though.
 				)
 			},
 			# sockets being closed will typically become "readable" and
@@ -229,7 +241,7 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
 
 	ret <- Rscript_payload(
 		bquote({
-			p <- nodepool:::mPool(.(port))
+			p <- nodepool:::mPool(.(port)) # FIXME: this gives us a NOTE
 			c(p$portnum, Sys.getpid())
 		}),
 		quote(p$run())

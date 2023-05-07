@@ -45,7 +45,8 @@
 				)
 				serialize(value, socket)
 				rm(value)
-			}
+			},
+			HALT = break
 		)
 		rm(msg)
 	}
