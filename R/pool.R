@@ -264,4 +264,5 @@ print.run_pool <- function(x, ...) {
 			c(' with ', l, ' local nodes included'),
 		'\n', sep = ''
 	)
+	invisible(x)
 }

@@ -74,4 +74,5 @@ run_node <- function(host, port, background = FALSE) {
 print.run_node <- function(x, ...) {
 	stopifnot(length(list(...)) == 0)
 	cat('Node started on PID', x, '\n')
+	invisible(x)
 }
