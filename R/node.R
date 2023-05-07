@@ -10,11 +10,20 @@
 	lbr <- tempfile('nodelib')
 	dir.create(lbr)
 	oldlib <- .libPaths()
-	.libPaths(lbr)
+	# any install.packages() calls will end up in the temporary library,
+	# but any already-installed packages can be loaded from libraries
+	# previously set up
+	.libPaths(c(lbr, oldlib))
 	on.exit(.libPaths(oldlib), add = TRUE)
 
 	# FIXME: can we make an empty environment that's otherwise just like
 	# the global environment and run the tasks there?
+	# NOTE: the environment turns out to be much less important because
+	# user-supplied functions will come with their own environments,
+	# which eventually reference R_GlobalEnv, which has attached
+	# packages as parents. Getting rid of globalenv() in the chain will
+	# take manual work and is probably counter-productive (cf. the
+	# attached packages).
 	env <- new.env(parent = loadNamespace('base'))
 
 	serialize(list(type = 'NODE'), socket)

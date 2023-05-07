@@ -260,7 +260,7 @@ print.run_pool <- function(x, ...) {
 	cat(
 		'Pool started on TCP port ', x, ' (PID ', attr(x, 'pid'), ')',
 		if ((l <- length(attr(x, 'nodepids'))) > 0)
-			' with ', l, ' local nodes included',
+			c(' with ', l, ' local nodes included'),
 		'\n', sep = ''
 	)
 }
