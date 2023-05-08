@@ -75,7 +75,7 @@ If you'd like to run a pool server in a background process without
 dedicating the current R session for that pass the `background = TRUE`
 argument to `run_node()`. In this case, the return value is a pool
 connection like the one returned by `pool_connect()`.  Use
-`pool_halt(pool)` to stop the background process one you're done.
+`pool_halt(pool)` to stop the background process once you're done.
 
 Nodes can also be started in the background, using the same
 `background = TRUE` argument to `run_node()`. The background node
