@@ -20,7 +20,7 @@ go from the "clients" to the "pool server", then from the "pool" to the
 Installation
 ------------
 
-You can install the package from the private repo:
+You can install the source package from the private repo:
 
 ```
 install.packages('nodepool', contriburl='https://aitap.github.io/nodepool-releases')
@@ -38,8 +38,8 @@ How can I use it?
 
 Pick the machine that is visible from all other machines and note its
 network address. This will be the pool server. In this example, the pool
-server has an address of `192.0.2.1`. Pick a [port number] too; we'll be
-using `12345` here.
+server has an address of `192.0.2.1`. Pick an unoccupied [port number]
+too; we'll be using `12345` here.
 
 Mind that there's currently no security, so don't start this on a
 publicly available connection; instead use [SSH tunnels]. Every node and
@@ -61,11 +61,26 @@ process, install `nodepool` and run:
 nodepool::run_node('192.0.2.1', 12345)
 ```
 
+Pass the `nodes` argument to `run_pool()` in order to have the pool
+automatically include the specified number of nodes running on the same
+machine as the server.
+
 On the client machine(s), load the package using `library(nodepool)`.
-Use `pool <- connect_pool('192.0.2.1', 12345)` in order to connect to
+Use `pool <- pool_connect('192.0.2.1', 12345)` in order to connect to
 the pool.  Currently, there's only one function that submits tasks to
-the pool, and it's `lbapply(list, function, pool)`. It is more or less
-similar to `parallel::parLapplyLB`.
+the pool, and it's `lbapply(list, function, pool, ...)`. It is more or
+less similar to `parallel::parLapplyLB`.
+
+If you'd like to run a pool server in a background process without
+dedicating the current R session for that pass the `background = TRUE`
+argument to `run_node()`. In this case, the return value is a pool
+connection like the one returned by `pool_connect()`.  Use
+`pool_halt(pool)` to stop the background process one you're done.
+
+Nodes can also be started in the background, using the same
+`background = TRUE` argument to `run_node()`. The background node
+process will when the pool is halted, or you'll can interrupt it
+manually using the facilities provided by your operating system.
 
 If a node's connection drops, its tasks are redistributed to other
 nodes, but it's welcome to connect again later. Additional nodes can
