@@ -241,10 +241,10 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
 
 	ret <- Rscript_payload(
 		bquote({
-			p <- nodepool:::mPool(.(port)) # FIXME: this gives us a NOTE
-			c(p$portnum, Sys.getpid())
+			.pool <- loadNamespace('nodepool')$mPool(.(port))
+			c(.pool$portnum, Sys.getpid())
 		}),
-		quote(p$run())
+		quote(.pool$run())
 	)
 	nodes <- replicate(nodes, run_node('localhost', ret[1], TRUE), FALSE)
 	structure(
