@@ -124,7 +124,7 @@ and provide a measure of protection (the server and the clients mutually
 authenticating each other using asymmetric cryptography in the CURVE
 extension).
 
-[R]: https://r-project.org/
+[R]: https://www.r-project.org/
 [port number]: https://en.wikipedia.org/wiki/Transmission_Control_Protocol#TCP_ports
 [SSH tunnels]: https://en.wikipedia.org/wiki/SSH_tunnel#Secure_Shell_tunneling
 [caching]: https://cran.r-project.org/package=depcache
