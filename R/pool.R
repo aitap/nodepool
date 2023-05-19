@@ -86,7 +86,7 @@ mPool <- setRefClass('Pool',
 			sock <- client$socket
 			client$socket <- NULL
 			remove_client(client)
-			.self$nodes <- c(nodes, list(mNodeConnection(sock, .self)))
+			.self$nodes <- c(nodes, list(mNodeConnection(sock, .self, client$format)))
 		},
 		halt = function() {
 			# disconnect the nodes gracefully
@@ -111,17 +111,19 @@ setClassUnion('optional_Pool', c('Pool', 'NULL'))
 setRefClass('ConnectionBase',
 	fields = list(
 		socket = 'optional_sockconn',
-		pool = 'optional_Pool'
+		pool = 'optional_Pool',
+		format = 'numeric'
 	),
 	contains = c('Connection', 'VIRTUAL'),
 	methods = list(
 		# We're more or less guaranteed to be called with an empty
 		# argument list, so we have to allow empty Connection objects
 		# (socket = NULL), even if they are otherwise useless.
-		initialize = function(socket = NULL, pool = NULL) {
+		initialize = function(socket = NULL, pool = NULL, format = 2) {
 			stopifnot(missing(socket) == missing(pool))
 			.self$socket <- socket
 			.self$pool <- pool
+			.self$format <- format
 		},
 		finalize = function() if (!is.null(socket)) {
 			close(socket)
@@ -159,7 +161,7 @@ mClientConnection <- setRefClass('ClientConnection',
 		need_write = function() length(results) > 0,
 		process_event = function() tryCatch(
 			if (need_write()) {
-				serialize(results[[1]], socket)
+				serialize(results[[1]], socket, version = format)
 				# pop *after* a successful write, not before
 				.self$results <- results[-1]
 			} else {
@@ -171,11 +173,14 @@ mClientConnection <- setRefClass('ClientConnection',
 						payload = msg
 					)),
 					NODE = pool$make_node(.self),
-					HALT = pool$halt()
-					# TODO: accept serialize() version. The server won't
-					# run on R<4, but the clients/nodes don't depend on
-					# anything modern. We'll have to handle this
-					# gracefully before we attempt to start up, though.
+					HALT = pool$halt(),
+					HELO = {
+						format <- msg$format
+						if (
+							is.atomic(format) && length(format) == 1 &&
+							format %in% 2:3
+						) .self$format <- format
+					}
 				)
 			},
 			# sockets being closed will typically become "readable" and
