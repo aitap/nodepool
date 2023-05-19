@@ -230,7 +230,11 @@ mNodeConnection <- setRefClass('NodeConnection',
 )
 
 run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
-	stopifnot(length(nodes) == 1, nodes == round(nodes))
+	stopifnot(
+		length(nodes) == 1,
+		nodes == round(nodes),
+		'Need R >= 4.0 in order to start a pool' = exists('serverSocket', baseenv())
+	)
 
 	if (!background) {
 		stopifnot(!is.null(port))
