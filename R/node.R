@@ -1,5 +1,5 @@
 .run_node <- function(host, port) {
-	socket <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
+	socket <- pool_connect(host, port)
 	on.exit(close(socket), add = TRUE)
 
 	wd <- tempfile('nodewd')

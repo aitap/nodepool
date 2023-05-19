@@ -3,6 +3,10 @@ pool_connect <- function(host, port) {
 	attr(ret, 'host') <- host
 	attr(ret, 'port') <- port
 	class(ret) <- c('pool_connection', class(ret))
+	serialize(
+		list(type = 'HELO', format = if (getRversion() < '3.5.0') 2 else 3),
+		ret
+	)
 	ret
 }
 
