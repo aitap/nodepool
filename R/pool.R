@@ -95,7 +95,7 @@ mPool <- setRefClass('Pool',
 			# initiating the shutdown, so all but one ought to have
 			# disconnected already.
 			for (node in nodes) try(
-				serialize(list(type = 'HALT'), node$socket),
+				node$send(list(type = 'HALT')),
 				TRUE
 			)
 			.self$running <- FALSE
@@ -130,11 +130,13 @@ setRefClass('ConnectionBase',
 			.self$socket <- NULL
 		},
 		# Used for select().
-		need_write = function() FALSE
+		need_write = function() FALSE,
 		# Subclasses *must* define a process_event() method that would
 		# obtain the event however it can and call the referenced Pool
 		# object to handle it. It will be called if socketSelect()
 		# returns the corresponding socket as available.
+		send = function(object)
+			serialize(object, socket, version = format)
 	)
 )
 
@@ -161,7 +163,7 @@ mClientConnection <- setRefClass('ClientConnection',
 		need_write = function() length(results) > 0,
 		process_event = function() tryCatch(
 			if (need_write()) {
-				serialize(results[[1]], socket, version = format)
+				send(results[[1]])
 				# pop *after* a successful write, not before
 				.self$results <- results[-1]
 			} else {
@@ -218,7 +220,7 @@ mNodeConnection <- setRefClass('NodeConnection',
 		process_event = function() tryCatch(
 			if (need_write()) {
 				.self$task <- pool$pop_task()
-				serialize(task$payload, socket)
+				send(task$payload)
 			} else {
 				msg <- unserialize(socket)
 				switch(msg$type,
