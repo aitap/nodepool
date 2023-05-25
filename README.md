@@ -23,7 +23,7 @@ Installation
 You can install the source package from the private repo:
 
 ```
-install.packages('nodepool', contriburl='https://aitap.github.io/nodepool-releases')
+install.packages('nodepool', contriburl='https://aitap.github.io/nodepool-releases', type = 'source')
 ```
 
 Alternatively, you can install `nodepool` from GitHub using the `remotes`
