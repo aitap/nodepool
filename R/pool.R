@@ -177,11 +177,11 @@ mClientConnection <- setRefClass('ClientConnection',
 					NODE = pool$make_node(.self),
 					HALT = pool$halt(),
 					HELO = {
-						format <- msg$format
+						f <- msg$format
 						if (
-							is.atomic(format) && length(format) == 1 &&
-							format %in% 2:3
-						) .self$format <- format
+							is.atomic(f) && length(f) == 1 &&
+							f %in% 2:3
+						) .self$format <- f
 					}
 				)
 			},
