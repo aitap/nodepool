@@ -26,7 +26,9 @@ Rscript_payload <- function(value, continue) {
 	on.exit(unlink(path), add = TRUE)
 
 	Rscript(substitute({
-		saveRDS(value, path)
+		t <- tempfile(tmpdir = dirname(path))
+		saveRDS(value, t)
+		file.rename(t, path)
 		continue
 	}, list(path = path, value = value, continue = continue)))
 
