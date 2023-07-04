@@ -1,3 +1,35 @@
+.nodeloop <- function(socket, env) repeat {
+	# otherwise unserialize() eventually fails with a timeout
+	socketSelect(list(socket))
+	msg <- unserialize(socket)
+	switch(msg$type,
+		EXEC = {
+			# adapted from the "parallel" package, GPL-2|GPL-3, (c) R Core Team
+			success <- TRUE
+			handler <- function(e) {
+				success <<- FALSE
+				e
+			}
+			t1 <- proc.time()
+			value <- tryCatch(
+				do.call(
+					msg$data$fun, msg$data$args,
+					quote = TRUE, envir = env
+				),
+				error = handler
+			)
+			t2 <- proc.time()
+			value <- list(
+				type = "VALUE", value = value, success = success,
+				time = t2 - t1, tag = msg$data$tag
+			)
+			serialize(value, socket)
+			rm(value)
+		},
+		HALT = break
+	)
+}
+
 .run_node <- function(host, port) {
 	socket <- pool_connect(host, port)
 	on.exit(close(socket), add = TRUE)
@@ -25,38 +57,7 @@
 	on.exit(detach(envname), add = TRUE)
 
 	serialize(list(type = 'NODE'), socket)
-	repeat {
-		# otherwise unserialize() eventually fails with a timeout
-		socketSelect(list(socket))
-		msg <- unserialize(socket)
-		switch(msg$type,
-			EXEC = {
-				# adapted from the "parallel" package, GPL-2|GPL-3, (c) R Core Team
-				success <- TRUE
-				handler <- function(e) {
-					success <<- FALSE
-					e
-				}
-				t1 <- proc.time()
-				value <- tryCatch(
-					do.call(
-						msg$data$fun, msg$data$args,
-						quote = TRUE, envir = env
-					),
-					error = handler
-				)
-				t2 <- proc.time()
-				value <- list(
-					type = "VALUE", value = value, success = success,
-					time = t2 - t1, tag = msg$data$tag
-				)
-				serialize(value, socket)
-				rm(value)
-			},
-			HALT = break
-		)
-		rm(msg)
-	}
+	.nodeloop(socket, env)
 }
 
 run_node <- function(host, port, background = FALSE) {
