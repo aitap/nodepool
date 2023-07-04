@@ -19,12 +19,10 @@
 	# NOTE: the environment turns out to be much less important because
 	# user-supplied functions will come with their own environments,
 	# which eventually reference R_GlobalEnv, which has attached
-	# packages as parents. Getting rid of globalenv() in the chain will
-	# take manual work and is probably counter-productive (cf. the
-	# attached packages).
-	env <- new.env(parent = globalenv())
-	# FIXME: can we make an empty environment that's otherwise just like
-	# the global environment and run the tasks there?
+	# packages as parents.
+	envname <- rev(make.unique(c(search(), 'nodepool_node_workspace')))[1]
+	env <- attach(new.env(parent = emptyenv()), name = envname)
+	on.exit(detach(envname), add = TRUE)
 
 	serialize(list(type = 'NODE'), socket)
 	repeat {
