@@ -1,4 +1,4 @@
-.nodeloop <- function(socket, env) repeat {
+.nodeloop <- function(socket, env = new.env(parent = globalenv())) repeat {
 	# otherwise unserialize() eventually fails with a timeout
 	socketSelect(list(socket))
 	msg <- unserialize(socket)
@@ -48,26 +48,20 @@
 	.libPaths(c(lbr, oldlib))
 	on.exit(.libPaths(oldlib), add = TRUE)
 
-	# NOTE: the environment turns out to be much less important because
-	# user-supplied functions will come with their own environments,
-	# which eventually reference R_GlobalEnv, which has attached
-	# packages as parents.
-	envname <- rev(make.unique(c(search(), 'nodepool_node_workspace')))[1]
-	env <- attach(new.env(parent = emptyenv()), name = envname)
-	on.exit(detach(envname), add = TRUE)
-
 	serialize(list(type = 'NODE'), socket)
-	.nodeloop(socket, env)
+	.nodeloop(socket)
 }
 
 run_node <- function(host, port, background = FALSE) {
-	if (!background) return(.run_node(host, port))
+	# ::: raises a NOTE, so we're using a different idiom
+	if (background) {
+		ret <- Rscript_payload(
+			quote(Sys.getpid()),
+			bquote(loadNamespace('nodepool')$.run_node(.(host), .(port)))
+		)
+		structure(ret, class = 'run_node')
+	} else Rscript(bquote(loadNamespace('nodepool')$.run_node(.(host), .(port))), TRUE)
 
-	ret <- Rscript_payload(
-		quote(Sys.getpid()),
-		bquote(nodepool::run_node(.(host), .(port), FALSE))
-	)
-	structure(ret, class = 'run_node')
 }
 
 print.run_node <- function(x, ...) {
