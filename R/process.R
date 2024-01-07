@@ -1,12 +1,12 @@
 # Start an Rscript background process in the background and have it run
 # a given expression. Cannot even return the PID, though it's mostly
 # useless without a guarantee that it belongs to the same process.
-Rscript <- function(expr) system2(
+Rscript <- function(expr, wait = FALSE) system2(
 	file.path(R.home('bin'), 'Rscript'),
 	# can't use input = text here because Rscript isn't guaranteed to be
 	# fast enough to read the temp file before it's deleted by system2()
 	c('-e', shQuote(paste(deparse(expr), collapse = '\n'))),
-	wait = FALSE
+	wait = wait
 )
 
 # Start a background Rscript but have it return a value to the parent
@@ -37,5 +37,6 @@ Rscript_payload <- function(value, continue) {
 		if (!inherits(ret, 'try-error')) break
 		Sys.sleep(.5)
 	}
+	unlink(path)
 	ret
 }
