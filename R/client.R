@@ -1,52 +1,94 @@
-pool_connect <- function(host, port) {
-	ret <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
-	attr(ret, 'host') <- host
-	attr(ret, 'port') <- port
-	class(ret) <- c('pool_connection', class(ret))
-	serialize(
-		list(type = 'HELO', format = if (getRversion() < '3.5.0') 2 else 3),
-		ret
-	)
-	ret
+.makenode <- function(conn, state, index) structure(list(
+	conn = conn,
+	state = state,
+	index = index
+), class = 'nodepool_node')
+
+# Remember the index of the node corresponding to this task
+sendData.nodepool_node <- function(node, data) {
+	if (identical(data$type, 'EXEC')) {
+		# Since the results may arrive out of order, mark every job with
+		# the index of the node it has been submitted against.
+		orig_tag <- data$data$tag
+		data$data$tag <- node$index
+		serialize(data, node$conn)
+		node$state$byindex[[node$index]] <- list(
+			tag = orig_tag,
+			complete = FALSE,
+			value = NULL
+		)
+	} else serialize(data, node$conn)
 }
 
-print.pool_connection <- function(x, ...) {
-	stopifnot(length(list(...)) == 0)
+.recvOne <- function(conn, state) {
+	value <- unserialize(cl[[1]]$conn)
+
+	stopifnot(
+		'Internal error: received a job result without a tag' = !is.null(value$tag),
+		'Internal error: received a job result with an invalid tag' =
+			is.numeric(value$tag) && length(value$tag) == 1 &&
+			round(value$tag) == value$tag
+	)
+
+	index <- value$tag
+	value$tag <- state$byindex[[index]]$tag
+	list(node = index, value = value)
+}
+
+recvData.nodepool_node <- function(node) {
+	# Receive and remember responses as they come
+	while (!node$state$byindex[[node$index]]$complete) {
+		value <- .recvOne(node$conn, node$state)
+		node$state$byindex[[value$node]]$value <- value$value
+		node$state$byindex[[value$node]]$complete <- TRUE
+	}
+	value <- node$state$byindex[[node$index]]$value
+	on.exit(node$state$byindex[node$index] <- list(NULL))
+	value
+}
+
+# Read one response. Look up and repair the tag. Return.
+recvOneData.nodepool_cluster <- function(cl) {
+	.recvOne(cl[[1]]$conn, cl[[1]]$state)
+}
+
+stopCluster.nodepool_cluster <- function(cl) {
+	# TODO: use 'DONE' like in parallel itself
+	parallel:::sendData(cl[[1]], list(type = 'HALT'))
+	close(cl)
+}
+
+close.nodepool_cluster <- function(cl) close(cl[[1]]$conn)
+
+pool_connect <- function(host, port, length = 0x1000) {
+	conn <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
+	serialize(
+		list(type = 'HELO', format = if (getRversion() < '3.5.0') 2 else 3),
+		conn
+	)
+	state <- new.env(parent = emptyenv())
+	state$byindex <- vector('list', length)
+	structure(
+		lapply(
+			seq_len(length),
+			function(index) .makenode(conn, state, index)
+		),
+		class = c('nodepool_cluster', 'cluster'),
+		host = host,
+		port = port
+	)
+}
+
+print.nodepool_cluster <- function(x, ...) {
 	cat(
 		'<Connection to the pool server at ',
 		attr(x, 'host'), ':', attr(x, 'port'),
 		if (!is.null(pid <- attr(x, 'pid'))) paste0(' (PID ', pid, ')'),
 		if ((nodes <- length(attr(x, 'nodepids'))) > 0)
 			paste(' with', nodes, 'local node[s]'),
-		if (inherits(try(isOpen(x), TRUE), 'try-error'))
+		if (inherits(try(isOpen(x[[1]]$conn), TRUE), 'try-error'))
 			', currently closed',
 		'>\n', sep = ''
 	)
 	invisible(x)
-}
-
-pool_halt <- function(pool) {
-	serialize(list(type = 'HALT'), pool)
-	close(pool)
-}
-
-lbapply <- function(x, fun, pool, ...) {
-	for (i in seq_along(x))
-		serialize(
-			list(
-				type = 'EXEC',
-				data = list(fun = fun, args = list(x[[i]], ...), tag = i)
-			),
-			pool
-		)
-	ret <- list()
-	for (i in seq_along(x)) {
-		# the wait for results can be long, and unserialize() has been observed
-		# to fail with a timeout
-		socketSelect(list(pool))
-		value <- unserialize(pool)
-		if (!value$success) { warning(value$value) }
-		ret[[value$tag]] <- value$value
-	}
-	ret
 }
