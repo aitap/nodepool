@@ -247,7 +247,12 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
 		stopifnot(!is.null(port))
 		pool <- mPool(port)
 		for (i in seq_len(nodes)) run_node('localhost', port, TRUE)
+		# Cannot close() a socket twice, so have to let the finalizer do it.
+		# No way to hasten the finalizer except for this:
+		on.exit({rm(pool);gc()})
 		return(pool$run())
+		# Otherwise the serverSocket lingers open and prevents another pool
+		# from starting later.
 	}
 
 	ret <- Rscript_payload(
