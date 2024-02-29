@@ -60,7 +60,7 @@ stopCluster.nodepool_cluster <- function(cl) {
 
 close.nodepool_cluster <- function(cl) close(cl[[1]]$conn)
 
-pool_connect <- function(host, port, length = 0x1000) {
+pool_connect <- function(host, port, length = 0x80) {
 	conn <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
 	serialize(
 		list(type = 'HELO', format = if (getRversion() < '3.5.0') 2 else 3),
