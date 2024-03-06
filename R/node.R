@@ -29,7 +29,7 @@
 			serialize(value, socket)
 			rm(value)
 		},
-		HALT = break
+		DONE = break
 	)
 }
 

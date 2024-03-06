@@ -95,7 +95,7 @@ mPool <- setRefClass('Pool',
 			# initiating the shutdown, so all but one ought to have
 			# disconnected already.
 			for (node in nodes) try(
-				node$send(list(type = 'HALT')),
+				node$send(list(type = 'DONE')),
 				TRUE
 			)
 			.self$running <- FALSE
@@ -175,7 +175,7 @@ mClientConnection <- setRefClass('ClientConnection',
 						payload = msg
 					)),
 					NODE = pool$make_node(.self),
-					HALT = pool$halt(),
+					DONE = pool$halt(),
 					HELO = {
 						f <- msg$format
 						if (
