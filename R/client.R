@@ -21,7 +21,7 @@ sendData.nodepool_node <- function(node, data) {
 }
 
 .recvOne <- function(conn, state) {
-	value <- unserialize(cl[[1]]$conn)
+	value <- unserialize(conn)
 
 	stopifnot(
 		'Internal error: received a job result without a tag' = !is.null(value$tag),
@@ -52,20 +52,25 @@ recvOneData.nodepool_cluster <- function(cl) {
 	.recvOne(cl[[1]]$conn, cl[[1]]$state)
 }
 
-stopCluster.nodepool_cluster <- function(cl) {
+stopCluster.nodepool_cluster <- function(cl, ...) {
 	# TODO: use 'DONE' like in parallel itself
 	parallel:::sendData(cl[[1]], list(type = 'HALT'))
 	close(cl)
 }
 
-close.nodepool_cluster <- function(cl) close(cl[[1]]$conn)
+close.nodepool_cluster <- function(con, ...) close(con[[1]]$conn)
 
-pool_connect <- function(host, port, length = 0x80) {
+.do_connect <- function(host, port) {
 	conn <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
 	serialize(
 		list(type = 'HELO', format = if (getRversion() < '3.5.0') 2 else 3),
 		conn
 	)
+	conn
+}
+
+pool_connect <- function(host, port, length = 0x80) {
+	conn <- .do_connect(host, port)
 	state <- new.env(parent = emptyenv())
 	state$byindex <- vector('list', length)
 	structure(
