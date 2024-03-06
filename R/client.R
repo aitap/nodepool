@@ -54,7 +54,8 @@ recvOneData.nodepool_cluster <- function(cl) {
 
 stopCluster.nodepool_cluster <- function(cl, ...) {
 	# TODO: use 'DONE' like in parallel itself
-	parallel:::sendData(cl[[1]], list(type = 'HALT'))
+	# TODO: allow subclassing nodes
+	sendData.nodepool_node(cl[[1]], list(type = 'HALT'))
 	close(cl)
 }
 
