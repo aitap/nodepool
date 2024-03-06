@@ -236,7 +236,7 @@ mNodeConnection <- setRefClass('NodeConnection',
 	)
 )
 
-run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
+run_pool <- function(port = NULL, background = FALSE, nodes = 0, ...) {
 	stopifnot(
 		length(nodes) == 1,
 		nodes == round(nodes),
@@ -244,7 +244,10 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
 	)
 
 	if (!background) {
-		stopifnot(!is.null(port))
+		stopifnot(
+			!is.null(port),
+			length(list(...)) == 0
+		)
 		pool <- mPool(port)
 		for (i in seq_len(nodes)) run_node('localhost', port, TRUE)
 		# Cannot close() a socket twice, so have to let the finalizer do it.
@@ -264,7 +267,7 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
 	)
 	nodes <- replicate(nodes, run_node('localhost', ret[1], TRUE), FALSE)
 	structure(
-		pool_connect('localhost', ret[1]),
+		pool_connect('localhost', ret[1], ...),
 		pid = ret[2],
 		nodepids = nodes
 	)

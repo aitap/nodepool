@@ -1,7 +1,10 @@
 library(nodepool)
 library(parallel)
 
-pool <- run_pool(background = TRUE, nodes = 2)
+# NOTE: staticClusterApply will send a job containing a call to lapply()
+# to every node in the cluster, some of them empty, so for what we're
+# testing here, we must ensure length(cluster) == n_of_nodes.
+pool <- run_pool(background = TRUE, nodes = 2, length = 2)
 
 nodepids <- unlist(attr(pool, 'nodepids'))
 print(results <- parLapply(pool, 2:3, function(x, nodepids) {

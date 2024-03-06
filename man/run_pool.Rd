@@ -8,7 +8,7 @@
   them back.
 }
 \usage{
-  run_pool(port = NULL, background = FALSE, nodes = 0)
+  run_pool(port = NULL, background = FALSE, nodes = 0, \dots)
 }
 \arguments{
   \item{port}{
@@ -24,6 +24,10 @@
   \item{nodes}{
     The number of nodes to automatically launch as background processes
     to be included in the pool.
+  }
+  \item{\dots}{
+    When starting the pool in the background, forwarded to
+    \code{\link{pool_connect}}. Otherwise must be empty.
   }
 }
 \details{
