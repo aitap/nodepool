@@ -37,7 +37,7 @@
   stopped automatically when the returned object becomes subject to
   garbage collection or the parent R session terminates. The process
   \emph{can} be stopped by connecting to the pool and using
-  \code{\link{pool_halt}()}.
+  \code{\link[parallel]{stopCluster}()}.
 }
 \value{
   When \code{background = FALSE}: does not return (enters an infinite
@@ -52,8 +52,7 @@
 %TODO: \references{}
 
 \seealso{
-  \code{\link{run_node}} for actually running the tasks,
-  \code{\link{lbapply}} for the only client for now
+  \code{\link{run_node}} for actually running the tasks.
 }
 \examples{\dontrun{run_pool(12345)}}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
