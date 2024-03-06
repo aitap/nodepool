@@ -2,8 +2,10 @@ library(nodepool)
 library(parallel)
 
 # NOTE: staticClusterApply will send a job containing a call to lapply()
-# to every node in the cluster, some of them empty, so for what we're
-# testing here, we must ensure length(cluster) == n_of_nodes.
+# to every node in the cluster, some of them with 0-length lists as
+# arguments. We have to ensure length(cluster) == n_of_nodes, otherwise
+# there is a significant chance that one of the nodes only gets empty
+# lists as tasks and so doesn't show up.
 pool <- run_pool(background = TRUE, nodes = 2, length = 2)
 
 nodepids <- unlist(attr(pool, 'nodepids'))
@@ -20,9 +22,9 @@ stopifnot(
 )
 
 newnode <- run_node('localhost', attr(pool, 'port'), TRUE)
-eff.pids <- unlist(parLapply(pool, 1:2, function(.) {
+print(eff.pids <- unlist(parLapply(pool, 1:2, function(.) {
 	Sys.sleep(.5); Sys.getpid()
-}))
+})))
 stopifnot(
 	# new node must be accepted
 	setequal(eff.pids, c(nodepids[2], newnode))
