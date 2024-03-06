@@ -18,7 +18,13 @@
 
   \packageIndices{nodepool}
 }
-\author{Ivan Krylov}
+\author{
+  Ivan Krylov
+
+  Many thanks to Charlie Gao for starting the work on \PR{18587} and
+  demonstrating that custom \pkg{parallel} back-ends are possible in the
+  \CRANpkg{mirai} package.
+}
 % TODO:\references{}
 \keyword{package}
 \seealso{
