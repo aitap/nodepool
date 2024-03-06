@@ -1,15 +1,10 @@
 # client.R
+# see other exports in onLoad.R
 export(pool_connect)
 S3method(print, nodepool_cluster)
 S3method(close, nodepool_cluster)
-
-importFrom(parallel, stopCluster, sendData, recvData, recvOneData)
-
-S3method(recvData, nodepool_node)
-S3method(sendData, nodepool_node)
-
+importFrom(parallel, stopCluster)
 S3method(stopCluster, nodepool_cluster)
-S3method(recvOneData, nodepool_cluster)
 
 # node.R
 export(run_node)
