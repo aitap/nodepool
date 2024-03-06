@@ -24,5 +24,8 @@ stopifnot(
 	# new node must be accepted
 	setequal(eff.pids, c(nodepids[2], newnode))
 )
+tools::assertError(
+	print(parLapply(pool, 1, function(.) stop("This must fail")))
+)
 
 stopCluster(pool)

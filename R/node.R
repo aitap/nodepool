@@ -8,7 +8,10 @@
 			success <- TRUE
 			handler <- function(e) {
 				success <<- FALSE
-				e
+				structure(
+					conditionMessage(e),
+					class = 'try-error'
+				)
 			}
 			t1 <- proc.time()
 			value <- tryCatch(

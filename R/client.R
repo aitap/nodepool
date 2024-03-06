@@ -20,6 +20,7 @@ sendData.nodepool_node <- function(node, data) {
 	} else serialize(data, node$conn)
 }
 
+# Read one response. Look up and repair the tag. Return.
 .recvOne <- function(conn, state) {
 	value <- unserialize(conn)
 
@@ -47,7 +48,6 @@ recvData.nodepool_node <- function(node) {
 	value
 }
 
-# Read one response. Look up and repair the tag. Return.
 recvOneData.nodepool_cluster <- function(cl) {
 	.recvOne(cl[[1]]$conn, cl[[1]]$state)
 }
