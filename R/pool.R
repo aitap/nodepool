@@ -95,7 +95,7 @@ mPool <- setRefClass('Pool',
 			# initiating the shutdown, so all but one ought to have
 			# disconnected already.
 			for (node in nodes) try(
-				node$send(list(type = 'HALT')),
+				node$send(list(type = 'DONE')),
 				TRUE
 			)
 			.self$running <- FALSE
@@ -175,7 +175,7 @@ mClientConnection <- setRefClass('ClientConnection',
 						payload = msg
 					)),
 					NODE = pool$make_node(.self),
-					HALT = pool$halt(),
+					DONE = pool$halt(),
 					HELO = {
 						f <- msg$format
 						if (
@@ -236,7 +236,7 @@ mNodeConnection <- setRefClass('NodeConnection',
 	)
 )
 
-run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
+run_pool <- function(port = NULL, background = FALSE, nodes = 0, ...) {
 	stopifnot(
 		length(nodes) == 1,
 		nodes == round(nodes),
@@ -244,10 +244,18 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
 	)
 
 	if (!background) {
-		stopifnot(!is.null(port))
+		stopifnot(
+			!is.null(port),
+			length(list(...)) == 0
+		)
 		pool <- mPool(port)
 		for (i in seq_len(nodes)) run_node('localhost', port, TRUE)
+		# Cannot close() a socket twice, so have to let the finalizer do it.
+		# No way to hasten the finalizer except for this:
+		on.exit({rm(pool);gc()})
 		return(pool$run())
+		# Otherwise the serverSocket lingers open and prevents another pool
+		# from starting later.
 	}
 
 	ret <- Rscript_payload(
@@ -259,7 +267,7 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0) {
 	)
 	nodes <- replicate(nodes, run_node('localhost', ret[1], TRUE), FALSE)
 	structure(
-		pool_connect('localhost', ret[1]),
+		pool_connect('localhost', ret[1], ...),
 		pid = ret[2],
 		nodepids = nodes
 	)

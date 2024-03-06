@@ -1,6 +1,10 @@
 # client.R
-export(pool_connect, lbapply, pool_halt)
-S3method(print, pool_connection)
+# see other exports in onLoad.R
+export(pool_connect)
+S3method(print, nodepool_cluster)
+S3method(close, nodepool_cluster)
+importFrom(parallel, stopCluster)
+S3method(stopCluster, nodepool_cluster)
 
 # node.R
 export(run_node)

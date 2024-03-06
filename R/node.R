@@ -8,7 +8,10 @@
 			success <- TRUE
 			handler <- function(e) {
 				success <<- FALSE
-				e
+				structure(
+					conditionMessage(e),
+					class = 'try-error'
+				)
 			}
 			t1 <- proc.time()
 			value <- tryCatch(
@@ -26,12 +29,12 @@
 			serialize(value, socket)
 			rm(value)
 		},
-		HALT = break
+		DONE = break
 	)
 }
 
 .run_node <- function(host, port) {
-	socket <- pool_connect(host, port)
+	socket <- .do_connect(host, port)
 	on.exit(close(socket), add = TRUE)
 
 	wd <- tempfile('nodewd')

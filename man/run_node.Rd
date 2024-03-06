@@ -59,7 +59,7 @@
 %TODO: \references{}
 
 \seealso{
-  \code{\link{run_pool}}, \code{\link{lbapply}}
+  \code{\link{run_pool}}
 }
 \examples{\dontrun{run_node('localhost', 12345)}}
 % Add one or more standard keywords, see file 'KEYWORDS' in the

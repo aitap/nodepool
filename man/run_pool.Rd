@@ -8,7 +8,7 @@
   them back.
 }
 \usage{
-  run_pool(port = NULL, background = FALSE, nodes = 0)
+  run_pool(port = NULL, background = FALSE, nodes = 0, \dots)
 }
 \arguments{
   \item{port}{
@@ -25,6 +25,10 @@
     The number of nodes to automatically launch as background processes
     to be included in the pool.
   }
+  \item{\dots}{
+    When starting the pool in the background, forwarded to
+    \code{\link{pool_connect}}. Otherwise must be empty.
+  }
 }
 \details{
   Due to the way \code{\link{serverSocket}} currently works, the server
@@ -37,7 +41,7 @@
   stopped automatically when the returned object becomes subject to
   garbage collection or the parent R session terminates. The process
   \emph{can} be stopped by connecting to the pool and using
-  \code{\link{pool_halt}()}.
+  \code{\link[parallel]{stopCluster}()}.
 }
 \value{
   When \code{background = FALSE}: does not return (enters an infinite
@@ -52,8 +56,7 @@
 %TODO: \references{}
 
 \seealso{
-  \code{\link{run_node}} for actually running the tasks,
-  \code{\link{lbapply}} for the only client for now
+  \code{\link{run_node}} for actually running the tasks.
 }
 \examples{\dontrun{run_pool(12345)}}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
