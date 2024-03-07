@@ -21,6 +21,9 @@
 \author{
   Ivan Krylov
 
+  A part of the \code{\link{run_node}} function has been taken from the
+  \pkg{parallel} package, which is part of \R itself, \copyright R Core Team.
+
   Many thanks to Charlie Gao for starting the work on \PR{18587} and
   demonstrating that custom \pkg{parallel} back-ends are possible in the
   \CRANpkg{mirai} package.

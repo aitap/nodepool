@@ -56,8 +56,13 @@
   \code{run_node} containing the PID of the background process when it
   started.
 }
-%TODO: \references{}
+\author{
+  Ivan Krylov
 
+  A part of the function has been taken from the \pkg{parallel} package, which
+  is part of \R itself, \copyright R Core Team.
+}
+%TODO: \references{}
 \seealso{
   \code{\link{run_pool}}
 }
