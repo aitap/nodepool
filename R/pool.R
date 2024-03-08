@@ -259,7 +259,7 @@ mNodeConnection <- setRefClass('NodeConnection',
 	)
 )
 
-run_pool <- function(port = NULL, background = FALSE, nodes = 0, ...) {
+run_pool <- function(port = NULL, background = FALSE, nodes = 0, verbose = TRUE, ...) {
 	stopifnot(
 		length(nodes) == 1,
 		nodes == round(nodes),
@@ -271,7 +271,7 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0, ...) {
 			!is.null(port),
 			length(list(...)) == 0
 		)
-		pool <- mPool(port)
+		pool <- mPool(port, verbose = verbose)
 		for (i in seq_len(nodes)) run_node('localhost', port, TRUE)
 		# Cannot close() a socket twice, so have to let the finalizer do it.
 		# No way to hasten the finalizer except for this:
@@ -283,7 +283,7 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0, ...) {
 
 	ret <- Rscript_payload(
 		bquote({
-			.pool <- loadNamespace('nodepool')$mPool(.(port))
+			.pool <- loadNamespace('nodepool')$mPool(.(port), .(verbose))
 			c(.pool$portnum, Sys.getpid())
 		}),
 		quote(.pool$run())
