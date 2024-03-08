@@ -51,15 +51,19 @@ mPool <- setRefClass('Pool',
 			connections <- c(list(server), clients, nodes)
 			to_write <- vapply(connections, function(s) s$need_write(), FALSE)
 			sockets <- lapply(connections, function(s) s$socket)
-			print(setNames(
+			events <- socketSelect(sockets, to_write)
+			if (.self$verbose) print(noquote(rbind(
 				ifelse(to_write, 'write', 'read'),
 				c(
 					'server',
 					rep('client', length(clients)),
 					rep('node', length(nodes))
-				)
-			))
-			idx <- which.max(socketSelect(sockets, to_write))
+				),
+				ifelse(events, 'event', '-')
+			)))
+			# guess what, sample(<length-1 whole number>) will act like sample.int!
+			which.events <- which(events)
+			idx <- which.events[sample.int(length(which.events), 1)]
 			if (.self$verbose) cat('Event at socket ', idx, '\n')
 			connections[[idx]]$process_event()
 		},
