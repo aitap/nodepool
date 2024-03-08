@@ -10,7 +10,8 @@ mPool <- setRefClass('Pool',
 		tasks = 'list',    # actually list<Task>
 		# would like these to be mutable
 
-		running = 'logical'
+		running = 'logical',
+		verbose = 'logical'
 	),
 	methods = list(
 		listen = function(port) {
@@ -29,12 +30,13 @@ mPool <- setRefClass('Pool',
 			.self$portnum <- as.integer(port)
 			.self$server <- mServerConnection(socket = socket, pool = .self)
 		},
-		initialize = function(port) {
+		initialize = function(port, verbose = TRUE) {
 			listen(port)
 			.self$clients <- list()
 			.self$nodes <- list()
 			.self$tasks <- list()
 			.self$running <- TRUE
+			.self$verbose <- TRUE
 		},
 		show = function() cat(
 			'<Pool(port=', portnum, '): ',
@@ -45,10 +47,20 @@ mPool <- setRefClass('Pool',
 			'>\n', sep = ''
 		),
 		process_one_event = function() {
+			if (.self$verbose) show()
 			connections <- c(list(server), clients, nodes)
 			to_write <- vapply(connections, function(s) s$need_write(), FALSE)
 			sockets <- lapply(connections, function(s) s$socket)
+			print(setNames(
+				ifelse(to_write, 'write', 'read'),
+				c(
+					'server',
+					rep('client', length(clients)),
+					rep('node', length(nodes))
+				)
+			))
 			idx <- which.max(socketSelect(sockets, to_write))
+			if (.self$verbose) cat('Event at socket ', idx, '\n')
 			connections[[idx]]$process_event()
 		},
 		add_connection = function(client) {
@@ -143,12 +155,14 @@ setRefClass('ConnectionBase',
 mServerConnection <- setRefClass('ServerConnection',
 	contains = 'ConnectionBase',
 	methods = list(
-		process_event = function() try(
+		process_event = function() try({
+			if (pool$verbose) writeLines('Trying to accept new connection')
 			# Yes, accept() may fail
 			pool$add_connection(mClientConnection(
 				socketAccept(socket, open = 'a+b', blocking = TRUE), pool
 			))
-		)
+			if (pool$verbose) writeLines('Accepted new connection')
+		})
 	)
 )
 
@@ -165,11 +179,14 @@ mClientConnection <- setRefClass('ClientConnection',
 		need_write = function() length(results) > 0,
 		process_event = function() tryCatch(
 			if (need_write()) {
+				if (pool$verbose) writeLines('Sending results to client')
 				send(results[[1]])
 				# pop *after* a successful write, not before
 				.self$results <- results[-1]
+				if (pool$verbose) writeLines('Sent results to client')
 			} else {
 				msg <- unserialize(socket)
+				if (pool$verbose) cat('Client message of type ', msg$type, '\n')
 				switch(msg$type,
 					EXEC = pool$add_task(mTask(
 						client = .self,
@@ -221,10 +238,14 @@ mNodeConnection <- setRefClass('NodeConnection',
 			if (!is.null(task)) FALSE else length(pool$tasks) > 0,
 		process_event = function() tryCatch(
 			if (need_write()) {
+				if (pool$verbose) writeLines('Sending task to node')
 				.self$task <- pool$pop_task()
 				send(task$payload)
+				if (pool$verbose) writeLines('Sent task to node')
 			} else {
+				if (pool$verbose) writeLines('Reading result from node')
 				msg <- unserialize(socket)
+				if (pool$verbose) cat('Read ', msg$type, ' from node\n')
 				switch(msg$type,
 					VALUE = {
 						msg$tag <- task$tag
@@ -238,7 +259,7 @@ mNodeConnection <- setRefClass('NodeConnection',
 	)
 )
 
-run_pool <- function(port = NULL, background = FALSE, nodes = 0, ...) {
+run_pool <- function(port = NULL, background = FALSE, nodes = 0, verbose = TRUE, ...) {
 	stopifnot(
 		length(nodes) == 1,
 		nodes == round(nodes),
@@ -250,7 +271,7 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0, ...) {
 			!is.null(port),
 			length(list(...)) == 0
 		)
-		pool <- mPool(port)
+		pool <- mPool(port, verbose = verbose)
 		for (i in seq_len(nodes)) run_node('localhost', port, TRUE)
 		# Cannot close() a socket twice, so have to let the finalizer do it.
 		# No way to hasten the finalizer except for this:
@@ -262,7 +283,7 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0, ...) {
 
 	ret <- Rscript_payload(
 		bquote({
-			.pool <- loadNamespace('nodepool')$mPool(.(port))
+			.pool <- loadNamespace('nodepool')$mPool(.(port), .(verbose))
 			c(.pool$portnum, Sys.getpid())
 		}),
 		quote(.pool$run())
