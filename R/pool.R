@@ -143,10 +143,12 @@ setRefClass('ConnectionBase',
 mServerConnection <- setRefClass('ServerConnection',
 	contains = 'ConnectionBase',
 	methods = list(
-		process_event = function()
+		process_event = function() try(
+			# Yes, accept() may fail
 			pool$add_connection(mClientConnection(
 				socketAccept(socket, open = 'a+b', blocking = TRUE), pool
 			))
+		)
 	)
 )
 
