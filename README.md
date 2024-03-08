@@ -67,9 +67,11 @@ machine as the server.
 
 On the client machine(s), load the package using `library(nodepool)`.
 Use `pool <- pool_connect('192.0.2.1', 12345)` in order to connect to
-the pool.  Currently, there's only one function that submits tasks to
-the pool, and it's `lbapply(list, function, pool, ...)`. It is more or
-less similar to `parallel::parLapplyLB`.
+the pool. The pool connection pretends to be a `parallel` cluster with a
+pre-determined number of nodes. This introduces a few caveats, such as
+`clusterEvalQ()` or `clusterExport()` being unable to guarantee that all
+of the nodes of the cluster will run the expression; there is currently
+no workaround.
 
 If you'd like to run a pool server in a background process without
 dedicating the current R session for that pass the `background = TRUE`
