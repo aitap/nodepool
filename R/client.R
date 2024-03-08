@@ -22,6 +22,8 @@ sendData.nodepool_node <- function(node, data) {
 
 # Read one response. Look up and repair the tag. Return.
 .recvOne <- function(conn, state) {
+	# unserialize() will time out otherwise
+	socketSelect(list(conn))
 	value <- unserialize(conn)
 
 	stopifnot(
