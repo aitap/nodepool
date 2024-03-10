@@ -6,6 +6,10 @@
 
 # Remember the index of the node corresponding to this task
 sendData.nodepool_node <- function(node, data) {
+	# serialize() has a tentency to fail without an explanation.
+	# We might avoid a timeout by select()ing first, but it's more
+	# reliable to be able to reconnect automatically.
+	socketSelect(list(node$conn), TRUE)
 	if (identical(data$type, 'EXEC')) {
 		# Since the results may arrive out of order, mark every job with
 		# the index of the node it has been submitted against.

@@ -26,6 +26,8 @@
 				type = "VALUE", value = value, success = success,
 				time = t2 - t1, tag = msg$data$tag
 			)
+			# Who knows, maybe serialize() needs this too
+			socketSelect(list(socket), TRUE)
 			serialize(value, socket)
 			rm(value)
 		},
