@@ -3,12 +3,45 @@
 	state = state
 ), class = 'nodepool_node')
 
+# [un]serialize() has a tentency to fail without an explanation.
+# We might avoid a timeout by select()ing first.
+.maybe_serialize <- function(con, data) tryCatch({
+	socketSelect(list(con), TRUE)
+	serialize(data, con)
+	TRUE
+}, error = function(e) FALSE)
+.maybe_unserialize <- function(con) tryCatch({
+	socketSelect(list(con))
+	list(TRUE, unserialize(con))
+}, error = function(e) list(FALSE))
+
+# Establish the connection and submit all pending tasks
+.reset_client <- function(state, why) tryCatch({
+	message(format(Sys.time()), ': ', why, ', trying to restore')
+	if (!is.null(state$con)) close(state$con)
+	state$con <- NULL
+	state$con <- socketConnection(
+		state$host, state$port, blocking = TRUE, open = 'a+b'
+	)
+	for (node in state$byindex)
+		if (!isTRUE(node$complete) && !.maybe_serialize(state$con, node$task))
+			return(FALSE)
+	TRUE
+}, error = function(e) FALSE)
+
+.retry_serialize <- function(state, data) {
+	while (!.maybe_serialize(state$con, data))
+		while (!.reset_client(state, 'failed to send')) {}
+}
+
+.retry_unserialize <- function(state) repeat {
+	ret <- .maybe_unserialize(state$con)
+	if (ret[[1]]) return(ret[[2]])
+	while (!.reset_client(state, 'failed to receive')) {}
+}
+
 # Remember the index of the node corresponding to this task
 sendData.nodepool_node <- function(node, data) {
-	# serialize() has a tentency to fail without an explanation.
-	# We might avoid a timeout by select()ing first, but it's more
-	# reliable to be able to reconnect automatically.
-	socketSelect(list(node$state$conn), TRUE)
 	if (identical(data$type, 'EXEC')) {
 		# Since the results may arrive out of order, mark every job with
 		# the index of the node it has been submitted against.
@@ -20,15 +53,13 @@ sendData.nodepool_node <- function(node, data) {
 			value = NULL,
 			task = data
 		)
-		serialize(data, node$state$conn)
-	} else serialize(data, node$state$conn)
+		.retry_serialize(node$state, data)
+	} else .retry_serialize(node$state, data)
 }
 
 # Read one response. Look up and repair the tag. Return.
 .recvOne <- function(state) {
-	# unserialize() will time out otherwise
-	socketSelect(list(state$conn))
-	value <- unserialize(state$conn)
+	value <- .retry_unserialize(state)
 
 	stopifnot(
 		'Internal error: received a job result without a tag' = !is.null(value$tag),
@@ -64,7 +95,8 @@ stopCluster.nodepool_cluster <- function(cl, ...) {
 	close(cl)
 }
 
-close.nodepool_cluster <- function(con, ...) close(con[[1]]$state$conn)
+close.nodepool_cluster <- function(con, ...)
+	if (!is.null(con[[1]]$state$conn)) close(con[[1]]$state$conn)
 
 .do_connect <- function(host, port) {
 	conn <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
