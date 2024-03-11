@@ -18,24 +18,22 @@
 # Establish the connection and submit all pending tasks
 .reset_client <- function(state, why) tryCatch({
 	message(format(Sys.time()), ': ', why, ', trying to restore')
-	if (!is.null(state$con)) close(state$con)
-	state$con <- NULL
-	state$con <- socketConnection(
-		state$host, state$port, blocking = TRUE, open = 'a+b'
-	)
-	for (node in state$byindex)
-		if (!isTRUE(node$complete) && !.maybe_serialize(state$con, node$task))
+	if (!is.null(state$conn)) close(state$conn)
+	state$conn <- NULL
+	state$conn <- .do_connect(state$host, state$port)
+	for (task in state$byindex)
+		if (!is.null(task) && !isTRUE(task$complete) && !.maybe_serialize(state$conn, task$task))
 			return(FALSE)
 	TRUE
 }, error = function(e) FALSE)
 
 .retry_serialize <- function(state, data) {
-	while (!.maybe_serialize(state$con, data))
+	while (!.maybe_serialize(state$conn, data))
 		while (!.reset_client(state, 'failed to send')) {}
 }
 
 .retry_unserialize <- function(state) repeat {
-	ret <- .maybe_unserialize(state$con)
+	ret <- .maybe_unserialize(state$conn)
 	if (ret[[1]]) return(ret[[2]])
 	while (!.reset_client(state, 'failed to receive')) {}
 }
