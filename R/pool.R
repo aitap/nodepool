@@ -51,6 +51,13 @@ mPool <- setRefClass('Pool',
 			connections <- c(list(server), clients, nodes)
 			to_write <- vapply(connections, function(s) s$need_write(), FALSE)
 			sockets <- lapply(connections, function(s) s$socket)
+
+			# some sockets just don't want to be bothered at all for now
+			mask <- !is.na(to_write)
+			connections <- connections[mask]
+			sockets <- sockets[mask]
+			to_write <- to_write[mask]
+
 			events <- socketSelect(sockets, to_write)
 			if (.self$verbose) print(noquote(rbind(
 				ifelse(to_write, 'write', 'read'),
@@ -146,6 +153,7 @@ setRefClass('ConnectionBase',
 			.self$socket <- NULL
 		},
 		# Used for select().
+		# Return NA if not ready to read or write.
 		need_write = function() FALSE,
 		# Subclasses *must* define a process_event() method that would
 		# obtain the event however it can and call the referenced Pool
