@@ -14,12 +14,13 @@ sendData.nodepool_node <- function(node, data) {
 		# the index of the node it has been submitted against.
 		orig_tag <- data$data$tag
 		data$data$tag <- node$index
-		serialize(data, node$state$conn)
 		node$state$byindex[[node$index]] <- list(
 			tag = orig_tag,
 			complete = FALSE,
-			value = NULL
+			value = NULL,
+			task = data
 		)
+		serialize(data, node$state$conn)
 	} else serialize(data, node$state$conn)
 }
 
@@ -58,7 +59,7 @@ recvOneData.nodepool_cluster <- function(cl) {
 }
 
 stopCluster.nodepool_cluster <- function(cl, ...) {
-	# TODO: allow subclassing nodes
+	# NOTE: this makes it impossible to subclass nodes
 	sendData.nodepool_node(cl[[1]], list(type = 'DONE'))
 	close(cl)
 }
@@ -67,6 +68,8 @@ close.nodepool_cluster <- function(con, ...) close(con[[1]]$state$conn)
 
 .do_connect <- function(host, port) {
 	conn <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
+	# This is the only place where we do unprotected serialize().
+	# It's better to let a fresh connection fail right away.
 	serialize(
 		list(type = 'HELO', format = if (getRversion() < '3.5.0') 2 else 3),
 		conn
@@ -76,9 +79,15 @@ close.nodepool_cluster <- function(con, ...) close(con[[1]]$state$conn)
 
 pool_connect <- function(host, port, length = 0x80) {
 	conn <- .do_connect(host, port)
-	state <- new.env(parent = emptyenv())
-	state$conn <- conn
-	state$byindex <- vector('list', length)
+	state <- list2env(
+		list(
+			conn = conn,
+			byindex = vector('list', length),
+			host = host,
+			port = port
+		),
+		parent = emptyenv()
+	)
 	structure(
 		lapply(seq_len(length), .makenode, state = state),
 		class = c('nodepool_cluster', 'cluster'),
@@ -90,7 +99,7 @@ pool_connect <- function(host, port, length = 0x80) {
 print.nodepool_cluster <- function(x, ...) {
 	cat(
 		'<Connection to the pool server at ',
-		attr(x, 'host'), ':', attr(x, 'port'),
+		x[[1]]$state$host, ':', x[[1]]$state$port,
 		if (!is.null(pid <- attr(x, 'pid'))) paste0(' (PID ', pid, ')'),
 		if ((nodes <- length(attr(x, 'nodepids'))) > 0)
 			paste(' with', nodes, 'local node[s]'),
