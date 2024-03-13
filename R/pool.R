@@ -38,6 +38,15 @@ mPool <- setRefClass('Pool',
 			.self$running <- TRUE
 			.self$verbose <- TRUE
 		},
+		finalize = function() {
+			.self$running <- FALSE
+			server$finalize()
+			for (cl in clients) cl$finalize()
+			for (n in nodes) n$finalize()
+			.self$clients <- list()
+			.self$nodes <- list()
+			.self$tasks <- list()
+		},
 		show = function() cat(
 			'<Pool(port=', portnum, '): ',
 			length(clients), ' client(s), ',
@@ -193,7 +202,7 @@ mClientConnection <- setRefClass('ClientConnection',
 			if (need_write()) {
 				if (pool$verbose) writeLines('Sending results to client')
 				send(results[[1]])
-				# pop *after* a successful write, not before
+				# if this fails, the whole client is deleted together with the tasks
 				.self$results <- results[-1]
 				if (pool$verbose) writeLines('Sent results to client')
 			} else {
@@ -220,9 +229,8 @@ mClientConnection <- setRefClass('ClientConnection',
 			# then fail to read
 			error = function(e) pool$remove_client(.self)
 		),
-		add_result = function(payload) {
-			.self$results = c(results, list(payload))
-		}
+		add_result = function(payload)
+			.self$results <- c(results, list(payload))
 	)
 )
 
@@ -285,12 +293,10 @@ run_pool <- function(port = NULL, background = FALSE, nodes = 0, verbose = TRUE,
 		)
 		pool <- mPool(port, verbose = verbose)
 		for (i in seq_len(nodes)) run_node('localhost', port, TRUE)
-		# Cannot close() a socket twice, so have to let the finalizer do it.
-		# No way to hasten the finalizer except for this:
-		on.exit({rm(pool);gc()})
+		# Prevent the un-garbage-collected serverSocket from lingering open and
+		# preventing another pool from starting later.
+		on.exit(pool$finalize())
 		return(pool$run())
-		# Otherwise the serverSocket lingers open and prevents another pool
-		# from starting later.
 	}
 
 	ret <- Rscript_payload(
