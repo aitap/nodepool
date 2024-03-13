@@ -32,5 +32,16 @@ stopifnot(
 tools::assertError(
 	print(parLapply(pool, 1, function(.) stop("This must fail")))
 )
-
 stopCluster(pool)
+
+# Must successfully process a parLapply() of more entries than nodes in
+# the pool
+cl <- run_pool(background = TRUE, nodes = 2, length = 32)
+stopifnot(all.equal(
+	as.list(letters),
+	parLapply(cl, LETTERS, function(x) {
+		Sys.sleep(.05)
+		tolower(x)
+	})
+))
+stopCluster(cl)

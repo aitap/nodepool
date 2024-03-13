@@ -57,6 +57,18 @@ mPool <- setRefClass('Pool',
 		),
 		process_one_event = function() {
 			if (.self$verbose) show()
+
+			# Are clients asking to submit tasks?
+			requesting <- which(vapply(clients, function(cl) cl$requesting, FALSE))
+			for (cl in clients[requesting[sample.int(
+				length(requesting),
+				min(
+					# Allow up to the number of nodes currently free
+					max(0, length(nodes) - length(tasks)),
+					length(requesting)
+				)
+			)]]) cl$approve()
+
 			connections <- c(list(server), clients, nodes)
 			to_write <- vapply(connections, function(s) s$need_write(), FALSE)
 			sockets <- lapply(connections, function(s) s$socket)
@@ -191,10 +203,16 @@ mClientConnection <- setRefClass('ClientConnection',
 	fields = list(
 		# Data to be sent to the other side of the connection.
 		# To be used for already computed tasks.
-		results = 'list'
+		results = 'list',
+		# Whether this client would like to send a task
+		requesting = 'logical'
 	),
 	contains = 'ConnectionBase',
 	methods = list(
+		initialize = function(...) {
+			.self$requesting <- FALSE
+			callSuper(...)
+		},
 		# Write completed tasks back to the client; otherwise ask for
 		# more.
 		need_write = function() length(results) > 0,
@@ -223,13 +241,7 @@ mClientConnection <- setRefClass('ClientConnection',
 							f %in% 2:3
 						) .self$format <- f
 					},
-					REQUEST = {
-						# for now, allow tasks unconditionally
-						.self$results <- c(
-							list(list(type = 'PROCEED')),
-							results
-						)
-					}
+					REQUEST = .self$requesting <- TRUE
 				)
 			},
 			# sockets being closed will typically become "readable" and
@@ -237,7 +249,11 @@ mClientConnection <- setRefClass('ClientConnection',
 			error = function(e) pool$remove_client(.self)
 		),
 		add_result = function(payload)
-			.self$results <- c(results, list(payload))
+			.self$results <- c(results, list(payload)),
+		approve = function() {
+			.self$results <- c(list(list(type = 'PROCEED')), results)
+			.self$requesting <- FALSE
+		}
 	)
 )
 
