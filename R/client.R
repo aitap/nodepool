@@ -79,9 +79,13 @@ sendData.nodepool_node <- function(node, data) {
 			value$tag <- state$byindex[[index]]$tag
 			state$byindex[[index]]$value <- value
 			state$byindex[[index]]$complete <- TRUE
+
+			index
 		},
 		PROCEED = {
 			state$available <- TRUE
+
+			invisible()
 		}
 	)
 }
@@ -96,8 +100,12 @@ recvData.nodepool_node <- function(node) {
 	value
 }
 
-recvOneData.nodepool_cluster <- function(cl) {
-	.recvOne(cl[[1]]$state)
+recvOneData.nodepool_cluster <- function(cl) repeat {
+	index <- .recvOne(cl[[1]]$state)
+	if (!is.null(index)) return(list(
+		node = index,
+		value = recvData.nodepool_node(cl[[index]])
+	))
 }
 
 stopCluster.nodepool_cluster <- function(cl, ...) {
