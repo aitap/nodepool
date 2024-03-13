@@ -22,6 +22,7 @@
 	state$available <- FALSE
 	state$conn <- NULL
 	state$conn <- .do_connect(state$host, state$port)
+	# FIXME: when resubmitting while resetting, these transfers go out unconfirmed
 	for (task in state$byindex)
 		if (!is.null(task) && !isTRUE(task$complete) && !.maybe_serialize(state$conn, task$task))
 			return(FALSE)
@@ -39,14 +40,19 @@
 	while (!.reset_client(state, 'failed to receive')) {}
 }
 
+.submitOne <- function(state, data) {
+	# Wait until pool is able to handle the task
+	if (!state$available) {
+		.retry_serialize(state, list(type = 'REQUEST'))
+		while (!state$available) .recvOne(state)
+	}
+	.retry_serialize(state, data)
+	state$available <- FALSE
+}
+
 # Remember the index of the node corresponding to this task
 sendData.nodepool_node <- function(node, data) {
 	if (identical(data$type, 'EXEC')) {
-		# Wait until pool is able to handle the task
-		node$state$available <- FALSE
-		.retry_serialize(node$state, list(type = 'REQUEST'))
-		while (!node$state$available) .recvOne(node$state)
-
 		# Since the results may arrive out of order, mark every job with
 		# the index of the node it has been submitted against.
 		orig_tag <- data$data$tag
@@ -57,8 +63,7 @@ sendData.nodepool_node <- function(node, data) {
 			value = NULL,
 			task = data
 		)
-
-		.retry_serialize(node$state, data)
+		.submitOne(node$state, data)
 	} else .retry_serialize(node$state, data)
 }
 
@@ -101,11 +106,17 @@ recvData.nodepool_node <- function(node) {
 }
 
 recvOneData.nodepool_cluster <- function(cl) repeat {
-	index <- .recvOne(cl[[1]]$state)
-	if (!is.null(index)) return(list(
-		node = index,
-		value = recvData.nodepool_node(cl[[index]])
-	))
+	# anything already received?
+	complete <- vapply(cl[[1]]$state$byindex, `[[`, FALSE, 'complete')
+	if (any(complete)) {
+		index <- which.max(complete)
+		return(list(
+			node = index,
+			value = recvData.nodepool_node(cl[[index]])
+		))
+	}
+	# try to receive more
+	.recvOne(cl[[1]]$state)
 }
 
 stopCluster.nodepool_cluster <- function(cl, ...) {
