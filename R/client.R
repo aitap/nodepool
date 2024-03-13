@@ -107,7 +107,7 @@ recvData.nodepool_node <- function(node) {
 
 recvOneData.nodepool_cluster <- function(cl) repeat {
 	# anything already received?
-	complete <- vapply(cl[[1]]$state$byindex, `[[`, FALSE, 'complete')
+	complete <- vapply(cl[[1]]$state$byindex, function(x) isTRUE(x$complete), FALSE)
 	if (any(complete)) {
 		index <- which.max(complete)
 		return(list(
