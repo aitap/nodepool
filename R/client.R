@@ -19,6 +19,7 @@
 .reset_client <- function(state, why) tryCatch({
 	message(format(Sys.time()), ': ', why, ', trying to restore')
 	if (!is.null(state$conn)) close(state$conn)
+	state$available <- FALSE
 	state$conn <- NULL
 	state$conn <- .do_connect(state$host, state$port)
 	for (task in state$byindex)
@@ -59,25 +60,28 @@ sendData.nodepool_node <- function(node, data) {
 .recvOne <- function(state) {
 	value <- .retry_unserialize(state)
 
-	stopifnot(
-		'Internal error: received a job result without a tag' = !is.null(value$tag),
-		'Internal error: received a job result with an invalid tag' =
-			is.numeric(value$tag) && length(value$tag) == 1 &&
-			round(value$tag) == value$tag
-	)
+	switch(value$type,
+		VALUE = {
+			stopifnot(
+				'Internal error: received a job result without a tag' = !is.null(value$tag),
+				'Internal error: received a job result with an invalid tag' =
+					is.numeric(value$tag) && length(value$tag) == 1 &&
+					round(value$tag) == value$tag
+			)
 
-	index <- value$tag
-	value$tag <- state$byindex[[index]]$tag
-	list(node = index, value = value)
+			index <- value$tag
+			value$tag <- state$byindex[[index]]$tag
+			state$byindex[[index]]$value <- value
+			state$byindex[[index]]$complete <- TRUE
+		}
+	)
 }
 
 recvData.nodepool_node <- function(node) {
 	# Receive and remember responses as they come
-	while (!node$state$byindex[[node$index]]$complete) {
-		value <- .recvOne(node$state)
-		node$state$byindex[[value$node]]$value <- value$value
-		node$state$byindex[[value$node]]$complete <- TRUE
-	}
+	while (!node$state$byindex[[node$index]]$complete)
+		.recvOne(node$state)
+
 	value <- node$state$byindex[[node$index]]$value
 	on.exit(node$state$byindex[node$index] <- list(NULL))
 	value
@@ -114,7 +118,8 @@ pool_connect <- function(host, port, length = 0x80) {
 			conn = conn,
 			byindex = vector('list', length),
 			host = host,
-			port = port
+			port = port,
+			available = FALSE
 		),
 		parent = emptyenv()
 	)
