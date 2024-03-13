@@ -42,6 +42,11 @@
 # Remember the index of the node corresponding to this task
 sendData.nodepool_node <- function(node, data) {
 	if (identical(data$type, 'EXEC')) {
+		# Wait until pool is able to handle the task
+		node$state$available <- FALSE
+		.retry_serialize(node$state, list(type = 'REQUEST'))
+		while (!node$state$available) .recvOne(node$state)
+
 		# Since the results may arrive out of order, mark every job with
 		# the index of the node it has been submitted against.
 		orig_tag <- data$data$tag
@@ -52,6 +57,7 @@ sendData.nodepool_node <- function(node, data) {
 			value = NULL,
 			task = data
 		)
+
 		.retry_serialize(node$state, data)
 	} else .retry_serialize(node$state, data)
 }
@@ -73,6 +79,9 @@ sendData.nodepool_node <- function(node, data) {
 			value$tag <- state$byindex[[index]]$tag
 			state$byindex[[index]]$value <- value
 			state$byindex[[index]]$complete <- TRUE
+		},
+		PROCEED = {
+			state$available <- TRUE
 		}
 	)
 }

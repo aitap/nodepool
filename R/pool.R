@@ -222,6 +222,13 @@ mClientConnection <- setRefClass('ClientConnection',
 							is.atomic(f) && length(f) == 1 &&
 							f %in% 2:3
 						) .self$format <- f
+					},
+					REQUEST = {
+						# for now, allow tasks unconditionally
+						.self$results <- c(
+							list(list(type = 'PROCEED')),
+							results
+						)
 					}
 				)
 			},
