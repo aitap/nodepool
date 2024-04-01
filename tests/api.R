@@ -44,4 +44,11 @@ stopifnot(all.equal(
 		tolower(x)
 	})
 ))
+
+# must warn for uses of clusterCall and friends
+tools::assertWarning(
+	clusterEvalQ(cl, Sys.getpid()),
+	verbose = TRUE
+)
+
 stopCluster(cl)

@@ -50,8 +50,23 @@
 	state$available <- FALSE
 }
 
+.warnedOnce <- new.env(parent = emptyenv())
+
 # Remember the index of the node corresponding to this task
 sendData.nodepool_node <- function(node, data) {
+	if (
+		sys.nframe() >= 4 &&
+		identical(sys.function(-4), parallel::clusterCall) &&
+		!isTRUE(.warnedOnce$clusterCall)
+	) {
+		.warnedOnce$clusterCall <- TRUE
+		warning(
+			'Due to dynamic task distribution and the potential for ',
+			'nodes to leave and rejoin, clusterCall() will not work ',
+			'well with nodepool clusters, sorry.', call. = NULL
+		)
+	}
+
 	if (identical(data$type, 'EXEC')) {
 		# Since the results may arrive out of order, mark every job with
 		# the index of the node it has been submitted against.
