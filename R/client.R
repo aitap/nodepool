@@ -18,11 +18,15 @@
 # Establish the connection and submit all pending tasks
 .reset_client <- function(state, why) tryCatch({
 	message(format(Sys.time()), ': ', why, ', trying to restore')
-	if (!is.null(state$conn)) close(state$conn)
+	# If the user had close()d the connection, the following close()
+	# will keep failing indefinitely. Catch the (unlikely but possible)
+	# failure and try to make progress with a new connection.
+	if (!is.null(state$conn)) try(close(state$conn))
 	state$available <- FALSE
 	state$conn <- NULL
 	state$conn <- .do_connect(state$host, state$port)
 	# FIXME: when resubmitting while resetting, these transfers go out unconfirmed
+	# TODO: rewrite as a queue of unsent tasks and a function make_progress()
 	for (task in state$byindex)
 		if (!is.null(task) && !isTRUE(task$complete) && !.maybe_serialize(state$conn, task$task))
 			return(FALSE)
