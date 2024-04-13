@@ -21,13 +21,14 @@ stopifnot(
 	vapply(results, `[[`, 0, 2) == (2:3)^2
 )
 
-newnode <- run_node('localhost', attr(pool, 'port'), TRUE)
+newnodes <- run_node('localhost', attr(pool, 'port'), 1)
+Sys.sleep(.5) # oh well
 print(eff.pids <- unlist(parLapply(pool, 1:2, function(.) {
 	Sys.sleep(.5); Sys.getpid()
 })))
 stopifnot(
-	# new node must be accepted
-	setequal(eff.pids, c(nodepids[2], newnode))
+	# new nodes must be accepted
+	setequal(eff.pids, c(nodepids[2], newnodes))
 )
 tools::assertError(
 	print(parLapply(pool, 1, function(.) stop("This must fail")))

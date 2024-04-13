@@ -21,8 +21,9 @@
   }
   \item{background}{
     By default, the node is started in the current process (and keeps
-    working in an infinite loop). Set this parameter to \code{TRUE} to
-    start the node in a background process.
+    working in an infinite loop). Set this parameter to a whole number
+    to start multiple background processes. \code{TRUE} is also accepted
+    to mean one background process.
   }
   \item{x}{
     An object returned by \code{run_node}.
@@ -66,7 +67,7 @@
 \seealso{
   \code{\link{run_pool}}
 }
-\examples{\dontrun{run_node('localhost', 12345)}}
+\examples{\dontrun{run_node('localhost', 12345, 3)}}
 % Add one or more standard keywords, see file 'KEYWORDS' in the
 % R documentation directory (show via RShowDoc("KEYWORDS")):
 % \keyword{ ~kwd1 }

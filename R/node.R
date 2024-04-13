@@ -58,19 +58,29 @@
 }
 
 run_node <- function(host, port, background = FALSE) {
-	# ::: raises a NOTE, so we're using a different idiom
-	if (background) {
-		ret <- Rscript_payload(
-			quote(Sys.getpid()),
-			bquote(loadNamespace('nodepool')$.run_node(.(host), .(port)))
+	stopifnot(
+		length(background) == 1 && (
+			is.logical(background) || (
+				is.numeric(background) && background == round(background)
+			)
 		)
-		structure(ret, class = 'run_node')
-	} else Rscript(bquote(loadNamespace('nodepool')$.run_node(.(host), .(port))), TRUE)
-
+	)
+	if (isTRUE(background)) background <- 1L
+	if (background) structure(
+		replicate(background, Rscript_payload(
+			quote(Sys.getpid()),
+			# ::: raises a NOTE, so we're using a different idiom
+			bquote(loadNamespace('nodepool')$.run_node(.(host), .(port)))
+		)),
+		class = 'run_node'
+	) else Rscript(
+		bquote(loadNamespace('nodepool')$.run_node(.(host), .(port))),
+		TRUE
+	)
 }
 
 print.run_node <- function(x, ...) {
 	stopifnot(length(list(...)) == 0)
-	cat('Node started on PID', x, '\n')
+	cat('Node(s) started on PID', paste(x, collapse = ', '), '\n')
 	invisible(x)
 }
