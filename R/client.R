@@ -144,8 +144,10 @@ stopCluster.nodepool_cluster <- function(cl, ...) {
 	close(cl)
 }
 
-close.nodepool_cluster <- function(con, ...)
+close.nodepool_cluster <- function(con, ...) {
 	if (!is.null(con[[1]]$state$conn)) close(con[[1]]$state$conn)
+	con[[1]]$state$conn <- NULL
+}
 
 .do_connect <- function(host, port) {
 	conn <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
