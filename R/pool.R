@@ -80,15 +80,18 @@ mPool <- setRefClass('Pool',
 			to_write <- to_write[mask]
 
 			events <- socketSelect(sockets, to_write)
-			if (.self$verbose) print(noquote(rbind(
-				ifelse(to_write, 'write', 'read'),
-				c(
-					'server',
-					rep('client', length(clients)),
-					rep('node', length(nodes))
-				),
-				ifelse(events, 'event', '-')
-			)))
+			if (.self$verbose) {
+				cat(format(Sys.time()),'\n')
+				print(noquote(rbind(
+					ifelse(to_write, 'write', 'read'),
+					c(
+						'server',
+						rep('client', length(clients)),
+						rep('node', length(nodes))
+					),
+					ifelse(events, 'event', '-')
+				)))
+			}
 			# guess what, sample(<length-1 whole number>) will act like sample.int!
 			which.events <- which(events)
 			idx <- which.events[sample.int(length(which.events), 1)]
