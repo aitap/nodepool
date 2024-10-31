@@ -217,13 +217,14 @@ mClientConnection <- setRefClass('ClientConnection',
 		# more.
 		need_write = function() length(results) > 0,
 		process_event = function() tryCatch(
-			if (need_write()) {
-				if (pool$verbose) writeLines('Sending results to client')
-				send(results[[1]])
-				# if this fails, the whole client is deleted together with the tasks
-				.self$results <- results[-1]
-				if (pool$verbose) writeLines('Sent results to client')
-			} else {
+			# KLUDGE: a client may be already writing to us when we
+			# intend to write to it, which will create a deadlock if we
+			# start serialize()ing back at the same time. Check one last
+			# time before sending results.
+			# FIXME: this doesn't close the race window.
+			# TODO: make a REQUEST_VALUE command and don't send results
+			# before receiving it
+			if (!need_write() || socketSelect(list(socket), FALSE, 0)) {
 				msg <- unserialize(socket)
 				if (pool$verbose) cat('Client message of type ', msg$type, '\n')
 				switch(msg$type,
@@ -243,6 +244,12 @@ mClientConnection <- setRefClass('ClientConnection',
 					},
 					REQUEST = .self$requesting <- TRUE
 				)
+			} else {
+				if (pool$verbose) writeLines('Sending results to client')
+				send(results[[1]])
+				# if this fails, the whole client is deleted together with the tasks
+				.self$results <- results[-1]
+				if (pool$verbose) writeLines('Sent results to client')
 			},
 			# sockets being closed will typically become "readable" and
 			# then fail to read
