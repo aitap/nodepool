@@ -1,3 +1,76 @@
+.do_connect <- function(host, port) {
+	conn <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
+	# This is the only place where we do unprotected serialize().
+	# It's better to let a fresh connection fail right away.
+	serialize(
+		list(type = 'HELO', format = if (getRversion() < '3.5.0') 2 else 3),
+		conn
+	)
+	conn
+}
+
+# The client protocol
+# ===================
+# All requests are initiated by the client and answered by the pool.
+# Requests are serialized named lists with the 'type' field, a single
+# string, specifying the request type and other arbitrary fields.
+#
+# The first request is always of type HELO and following fields:
+# - format:   3, recommended
+#          or 2, if the client doesn't speak RDS format 3 (R < 3.5)
+# - protocol: 1, required
+#
+# To submit a task, the client must send a request of type REQUEST, wait
+# for the reply of type OK, then send one request of type EXEC and wait
+# for the reply of type OK. The EXEC request contains the following
+# fields:
+# - key:  will be returned together with the result
+# - fun:  the function to execute on the node
+# - args: the arguments to give to the function
+#
+# To receive a result, the client must send a request of type RECEIVE
+# and wait for the reply of type VALUE with the following fields:
+# - value:   the result of do.call(fun, args, quote = TRUE), if successful
+#         or the value of the error object, if signalled
+# - success: TRUE, if completed without singalling errors
+#         or FALSE, if an error was signalled and caught
+# - time:    an object of class proc_time containing the time it took to
+#            evaluate the requested expression
+# - tag:     the original tag submitted in the EXEC request.
+
+mPoolClient <- setRefClass('PoolClient',
+	fields = list(
+		host = 'character',
+		port = 'numeric',
+		socket = 'optional_sockconn'
+	),
+	methods = list(
+		initialize = function(host, port) {
+			stopifnot(
+				is.character(host), length(host) == 1,
+				is.numeric(port), length(port) == 1,
+				port %% 1 == 0, port %in% 1:65535
+			)
+			.self$host <- host
+			.self$port <- port
+			.self$socket <- NULL
+			connect(host, port)
+		},
+		finalize = function() { # never leak unclosed connections
+			if (!is.null(socket)) disconnect()
+		},
+		disconnect = function() {
+			stopifnot(!is.null(socket))
+			close(socket)
+			.self$socket <- NULL
+		},
+		connect = function() { # may fail right away
+			stopifnot(is.null(socket))
+			.self$socket <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
+		}
+	)
+)
+
 .makenode <- function(index, state) structure(list(
 	index = index,
 	state = state
