@@ -152,8 +152,6 @@ mPool <- setRefClass('Pool',
 )
 mPool$lock(c('portnum', 'server'))
 
-setOldClass(c('servsockconn', 'sockconn'))
-setClassUnion('optional_sockconn', c('servsockconn', 'sockconn', 'NULL'))
 setClassUnion('optional_Pool', c('Pool', 'NULL'))
 setRefClass('ConnectionBase',
 	fields = list(
