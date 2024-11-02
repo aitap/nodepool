@@ -21,7 +21,7 @@
 # - protocol: 1L, required
 #
 # To submit a task, the client must send a request of type REQUEST, wait
-# for the reply of type OK, then send one request of type EXEC and wait
+# for the reply of type PROCEED, then send one request of type EXEC and wait
 # for the reply of type OK. The EXEC request contains the following
 # fields:
 # - tag:  will be returned together with the result
@@ -46,11 +46,21 @@ mPoolClient <- setRefClass('PoolClient',
 		tasks = 'list'
 	),
 	methods = list(
+		show = function()
+			cat(sprintf(
+				"Connection to pool at %s:%d, %d task(s) in queue, currently %s\n",
+				host, port, list(tasks), if (connected()) 'active' else 'inactive'
+			)),
 		log = function(format, ...) message(
 			'[', format(Sys.time()), '] ',
 			sprintf(format, ...)
 		),
 		initialize = function(host, port) {
+			"Connects to the pool. 'host' must be a string specifying
+			the address of the pool server. 'port' must be a valid TCP
+			port number. If the first attempt to connect and exchange
+			messages, the operation fails. Subsequent failures will be
+			automatically retried."
 			stopifnot(
 				is.character(host), length(host) == 1,
 				is.numeric(port), length(port) == 1,
@@ -63,16 +73,17 @@ mPoolClient <- setRefClass('PoolClient',
 			if (!try_connect(host, port))
 				stop("Initial connection attempt failed")
 		},
-		finalize = function() { # never leak unclosed connections
-			if (!is.null(socket)) disconnect()
-		},
+		connected = function() !is.null(socket),
 		disconnect = function() {
 			stopifnot(!is.null(socket))
 			close(socket)
 			.self$socket <- NULL
 		},
-		# leaves disconnected on failure
+		finalize = function() if (connected()) disconnect(),
 		try_connect = function() {
+			"Precondition: connection not established (socket is NULL).
+			Returns TRUE if the connection and initial message exchange
+			succeeded. Otherwise returns FALSE and keeps socket = NULL."
 			stopifnot(is.null(socket))
 			tryCatch({
 				.self$socket <- socketConnection(
@@ -88,25 +99,41 @@ mPoolClient <- setRefClass('PoolClient',
 				FALSE
 			})
 		},
-		connected = function() !is.null(socket),
-		# send, recv disconnect on failure
-		send = function(payload) tryCatch({
-			while (!socketSelect(list(socket), TRUE)) {}
-			serialize(payload, socket)
-			TRUE
-		}, error = function(e) {
-			disconnect()
-			FALSE
-		}),
-		recv = function() tryCatch({
-			while (!socketSelect(list(socket))) {}
-			ret <- unserialize(socket)
-			list(ret)
-		}, error = function(e) {
-			disconnect()
-			NULL
-		}),
+		send = function(payload) {
+			"Precondition: connection established. Tries to send the
+			'payload' to the pool. Returns TRUE if sending succeeded.
+			Otherwise disconnects and returns FALSE."
+			tryCatch({
+				stopifnot(connected())
+				while (!socketSelect(list(socket), TRUE)) {}
+				serialize(payload, socket)
+				TRUE
+			}, error = function(e) {
+				disconnect()
+				FALSE
+			})
+		},
+		recv = function() {
+			"Precondition: connection established. Tries to receive one
+			message from the pool. Returns a one-element list containing
+			the message if succeeded. Otherwise disconnects and returns
+			NULL."
+			tryCatch({
+				stopifnot(connected())
+				while (!socketSelect(list(socket))) {}
+				ret <- unserialize(socket)
+				list(ret)
+			}, error = function(e) {
+				disconnect()
+				NULL
+			})
+		},
 		expect = function(type) {
+			"Precondition: connection established. Tries to receive a
+			message of the given type from the pool. Returns the message
+			if succeeded. Otherwise logs the protocol error, disconnects
+			and returns NULL."
+			stopifnot(connected())
 			val <- recv()
 			if (is.null(val)) return(NULL) # disconnected
 			if (identical(val[[1]]$type, type)) {
@@ -121,28 +148,74 @@ mPoolClient <- setRefClass('PoolClient',
 			}
 		},
 		do_submit_one = function(tag, fun, args) {
-			if (
-				send(list(type = 'REQUEST')) &&
-				!is.null(expect('PROCEED')) &&
-				send(list(
-					type = 'EXEC', tag = tag, fun = fun, args = args
+			"Preconditions: connection established, 'tag' must not be
+			already present among submitted tasks. Tries to send a task
+			to run do.call(fun, args) to the pool. Returns TRUE if
+			succeeded. Otherwise disconnects and returns NULL."
+			stopifnot(
+				connected(),
+				`Must not submit an already submitted tag` = all(vapply(
+					tasks, function(task, tag) !identical(tag, task$tag),
+					FALSE, tag
 				))
-			) TRUE else FALSE
+			)
+			send(list(type = 'REQUEST')) &&
+			!is.null(expect('PROCEED')) &&
+			send(list(
+				type = 'EXEC', tag = tag, fun = fun, args = args
+			)) &&
+			!is.null(expect('OK'))
+		},
+		reconnect_and_resubmit = function() repeat {
+			"Precondition: connection previously failed (socket is
+			NULL). Logs each attempt to reconnect. Returns after the
+			connection is established and all queued tasks are
+			submitted."
+			stopifnot(!connected())
+			log("reconnecting to resubmit %d task(s)", length(tasks))
+			if (!try_connect()) next
+			for (task in tasks)
+				if (!do_submit_one(task$tag, task$fun, task$args))
+					next
+			break
 		},
 		submit = function(tag, fun, args) {
+			"Puts the task in the queue and tries to submit it to the
+			pool. Returns after successfully submitting the task,
+			possibly reconnecting (and resubmitting everything) in the
+			process."
 			.self$tasks <- c(.self$tasks, list(
 				list(tag = tag, fun = fun, args = args)
 			))
 			if (connected() && do_submit_one(tag, fun, args)) return()
 			# disconnected! start from scratch
+			reconnect_and_resubmit()
+		},
+		get_result = function() {
+			"Precondition: must have previously submitted a task.
+			Receives the value for one of the queued tasks, possibly
+			after reconnecting and resubmitting them all. The format of
+			the value is a named list with the following elements:
+			- 'value': the value of the function call if it succeeed, or
+			the value of the signalled error condition if it failed.
+			- 'success': logical scalar indicating whether the
+			evaluation succeeded without raising an error.
+			- 'time': the time it took to evaluate the function call.
+			- 'tag': the original 'tag' given to submit()."
 			repeat {
-				log("reconnecting to resubmit %d task(s)", length(tasks))
-				if (!try_connect()) next
-				for (task in tasks)
-					if (!do_submit_one(task$tag, task$fun, task$args))
-						next
-				break
+				stopifnot(`Must only receive after having submitted a task`=length(tasks) > 0)
+				if (
+					connected() &&
+					send(list(type = 'RECEIVE')) &&
+					!is.null(ret <- do_get_one_result())
+				) break
+				reconnect_and_resubmit()
 			}
+			.self$tasks <- Filter(
+				function(task) !identical(task$tag, ret$tag),
+				.self$tasks
+			)
+			ret
 		}
 	)
 )
