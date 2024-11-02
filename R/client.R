@@ -16,15 +16,15 @@
 # string, specifying the request type and other arbitrary fields.
 #
 # The first request is always of type HELO and following fields:
-# - format:   3, recommended
-#          or 2, if the client doesn't speak RDS format 3 (R < 3.5)
-# - protocol: 1, required
+# - format:   3L, recommended
+#          or 2L, if the client doesn't speak RDS format 3 (R < 3.5)
+# - protocol: 1L, required
 #
 # To submit a task, the client must send a request of type REQUEST, wait
 # for the reply of type OK, then send one request of type EXEC and wait
 # for the reply of type OK. The EXEC request contains the following
 # fields:
-# - key:  will be returned together with the result
+# - tag:  will be returned together with the result
 # - fun:  the function to execute on the node
 # - args: the arguments to give to the function
 #
@@ -42,9 +42,14 @@ mPoolClient <- setRefClass('PoolClient',
 	fields = list(
 		host = 'character',
 		port = 'numeric',
-		socket = 'optional_sockconn'
+		socket = 'optional_sockconn',
+		tasks = 'list'
 	),
 	methods = list(
+		log = function(format, ...) message(
+			'[', format(Sys.time()), '] ',
+			sprintf(format, ...)
+		),
 		initialize = function(host, port) {
 			stopifnot(
 				is.character(host), length(host) == 1,
@@ -54,7 +59,9 @@ mPoolClient <- setRefClass('PoolClient',
 			.self$host <- host
 			.self$port <- port
 			.self$socket <- NULL
-			connect(host, port)
+			.self$tasks <- list()
+			if (!try_connect(host, port))
+				stop("Initial connection attempt failed")
 		},
 		finalize = function() { # never leak unclosed connections
 			if (!is.null(socket)) disconnect()
@@ -64,9 +71,78 @@ mPoolClient <- setRefClass('PoolClient',
 			close(socket)
 			.self$socket <- NULL
 		},
-		connect = function() { # may fail right away
+		# leaves disconnected on failure
+		try_connect = function() {
 			stopifnot(is.null(socket))
-			.self$socket <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
+			tryCatch({
+				.self$socket <- socketConnection(
+					host, port, blocking = TRUE, open = 'a+b'
+				)
+				send(list(
+					type = 'HELO',
+					format = if (getRversion() < '3.5.0') 2L else 3L,
+					protocol = 1L
+				))
+			}, error = function(e) {
+				if (!is.null(.self$socket)) disconnect()
+				FALSE
+			})
+		},
+		connected = function() !is.null(socket),
+		# send, recv disconnect on failure
+		send = function(payload) tryCatch({
+			while (!socketSelect(list(socket), TRUE)) {}
+			serialize(payload, socket)
+			TRUE
+		}, error = function(e) {
+			disconnect()
+			FALSE
+		}),
+		recv = function() tryCatch({
+			while (!socketSelect(list(socket))) {}
+			ret <- unserialize(socket)
+			list(ret)
+		}, error = function(e) {
+			disconnect()
+			NULL
+		}),
+		expect = function(type) {
+			val <- recv()
+			if (is.null(val)) return(NULL) # disconnected
+			if (identical(val[[1]]$type, type)) {
+				val
+			} else {
+				log(
+					'protocol error! expected %s, got %s',
+					type, val$type
+				)
+				disconnect()
+				NULL
+			}
+		},
+		do_submit_one = function(tag, fun, args) {
+			if (
+				send(list(type = 'REQUEST')) &&
+				!is.null(expect('PROCEED')) &&
+				send(list(
+					type = 'EXEC', tag = tag, fun = fun, args = args
+				))
+			) TRUE else FALSE
+		},
+		submit = function(tag, fun, args) {
+			.self$tasks <- c(.self$tasks, list(
+				list(tag = tag, fun = fun, args = args)
+			))
+			if (connected() && do_submit_one(tag, fun, args)) return()
+			# disconnected! start from scratch
+			repeat {
+				log("reconnecting to resubmit %d task(s)", length(tasks))
+				if (!try_connect()) next
+				for (task in tasks)
+					if (!do_submit_one(task$tag, task$fun, task$args))
+						next
+				break
+			}
 		}
 	)
 )
