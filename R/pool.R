@@ -59,7 +59,7 @@ mPool <- setRefClass('Pool',
 			if (.self$verbose) show()
 
 			# Are clients asking to submit tasks?
-			requesting <- which(vapply(clients, function(cl) cl$requesting, FALSE))
+			requesting <- which(vapply(clients, function(cl) cl$wants_submit, FALSE))
 			for (cl in clients[requesting[sample.int(
 				length(requesting),
 				min(
@@ -67,17 +67,11 @@ mPool <- setRefClass('Pool',
 					max(0, length(nodes) - length(tasks)),
 					length(requesting)
 				)
-			)]]) cl$approve()
+			)]]) cl$ok()
 
 			connections <- c(list(server), clients, nodes)
 			to_write <- vapply(connections, function(s) s$need_write(), FALSE)
 			sockets <- lapply(connections, function(s) s$socket)
-
-			# some sockets just don't want to be bothered at all for now
-			mask <- !is.na(to_write)
-			connections <- connections[mask]
-			sockets <- sockets[mask]
-			to_write <- to_write[mask]
 
 			events <- socketSelect(sockets, to_write)
 			if (.self$verbose) {
@@ -203,39 +197,37 @@ mServerConnection <- setRefClass('ServerConnection',
 mClientConnection <- setRefClass('ClientConnection',
 	fields = list(
 		# Data to be sent to the other side of the connection.
-		# To be used for already computed tasks.
-		results = 'list',
+		# To be used for approval messages and task results.
+		queue = 'list',
 		# Whether this client would like to send a task
-		requesting = 'logical'
+		wants_submit = 'logical',
+		wants_result = 'logical'
 	),
 	contains = 'ConnectionBase',
 	methods = list(
 		initialize = function(...) {
-			.self$requesting <- FALSE
+			.self$queue <- list()
+			.self$wants_submit <- FALSE
+			.self$wants_result <- FALSE
 			callSuper(...)
 		},
 		# Write completed tasks back to the client; otherwise ask for
 		# more.
-		need_write = function() length(results) > 0,
+		need_write = function() wants_result && length(queue) > 0,
 		process_event = function() tryCatch(
-			# KLUDGE: a client may be already writing to us when we
-			# intend to write to it, which will create a deadlock if we
-			# start serialize()ing back at the same time. Check one last
-			# time before sending results.
-			# FIXME: this doesn't close the race window.
-			# TODO: make a REQUEST_VALUE command and don't send results
-			# before receiving it
-			if (!need_write() || socketSelect(list(socket), FALSE, 0)) {
+			if (need_write()) {
+				if (pool$verbose)
+					log('Sending %s to client', queue[[1]]$type)
+				send(queue[[1]])
+				# if this fails, the whole client is deleted together with the tasks
+				.self$queue <- queue[-1]
+				if (pool$verbose) log('Sent to client')
+				.self$wants_result <- FALSE
+			} else {
+				if (pool$verbose) log('Reading from client')
 				msg <- unserialize(socket)
 				if (pool$verbose) cat('Client message of type ', msg$type, '\n')
 				switch(msg$type,
-					EXEC = pool$add_task(mTask(
-						client = .self,
-						tag = msg$data$tag,
-						payload = msg
-					)),
-					NODE = pool$make_node(.self),
-					DONE = pool$halt(),
 					HELO = {
 						f <- msg$format
 						if (
@@ -243,24 +235,30 @@ mClientConnection <- setRefClass('ClientConnection',
 							f %in% 2:3
 						) .self$format <- f
 					},
-					REQUEST = .self$requesting <- TRUE
+					REQUEST = .self$wants_submit <- TRUE,
+					EXEC = {
+						pool$add_task(mTask(
+							client = .self,
+							tag = msg$tag,
+							payload = msg
+						))
+						ok()
+					},
+					RECEIVE = .self$wants_result <- TRUE,
+					DONE = pool$halt(),
+					NODE = pool$make_node(.self)
 				)
-			} else {
-				if (pool$verbose) writeLines('Sending results to client')
-				send(results[[1]])
-				# if this fails, the whole client is deleted together with the tasks
-				.self$results <- results[-1]
-				if (pool$verbose) writeLines('Sent results to client')
 			},
 			# sockets being closed will typically become "readable" and
 			# then fail to read
 			error = function(e) pool$remove_client(.self)
 		),
-		add_result = function(payload)
-			.self$results <- c(results, list(payload)),
-		approve = function() {
-			.self$results <- c(list(list(type = 'PROCEED')), results)
-			.self$requesting <- FALSE
+		enqueue = function(payload)
+			.self$queue <- c(queue, list(payload)),
+		ok = function() {
+			.self$queue <- c(list(list(type = 'OK')), queue)
+			.self$wants_submit <- FALSE
+			.self$wants_result <- TRUE
 		}
 	)
 )
@@ -300,7 +298,7 @@ mNodeConnection <- setRefClass('NodeConnection',
 				switch(msg$type,
 					VALUE = {
 						msg$tag <- task$tag
-						task$client$add_result(msg)
+						task$client$enqueue(msg)
 					}
 				)
 				.self$task <- NULL

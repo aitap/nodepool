@@ -1,3 +1,14 @@
+.do_connect <- function(host, port) {
+	conn <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
+	# This is the only place where we do unprotected serialize().
+	# It's better to let a fresh connection fail right away.
+	serialize(
+		list(type = 'HELO', format = if (getRversion() < '3.5.0') 2 else 3),
+		conn
+	)
+	conn
+}
+
 .nodeloop <- function(socket, env = new.env(parent = globalenv())) repeat {
 	# otherwise unserialize() eventually fails with a timeout
 	socketSelect(list(socket))
@@ -16,7 +27,7 @@
 			t1 <- proc.time()
 			value <- tryCatch(
 				do.call(
-					msg$data$fun, msg$data$args,
+					msg$fun, msg$args,
 					quote = TRUE, envir = env
 				),
 				error = handler
@@ -24,7 +35,7 @@
 			t2 <- proc.time()
 			value <- list(
 				type = "VALUE", value = value, success = success,
-				time = t2 - t1, tag = msg$data$tag
+				time = t2 - t1, tag = msg$tag
 			)
 			# Who knows, maybe serialize() needs this too
 			socketSelect(list(socket), TRUE)

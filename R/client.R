@@ -1,13 +1,7 @@
-.do_connect <- function(host, port) {
-	conn <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
-	# This is the only place where we do unprotected serialize().
-	# It's better to let a fresh connection fail right away.
-	serialize(
-		list(type = 'HELO', format = if (getRversion() < '3.5.0') 2 else 3),
-		conn
-	)
-	conn
-}
+log <- function(format, ...) message(
+	'[', format(Sys.time()), '] ',
+	sprintf(format, ...)
+)
 
 # The client protocol
 # ===================
@@ -49,12 +43,8 @@ mPoolClient <- setRefClass('PoolClient',
 		show = function()
 			cat(sprintf(
 				"Connection to pool at %s:%d, %d task(s) in queue, currently %s\n",
-				host, port, list(tasks), if (connected()) 'active' else 'inactive'
+				host, port, length(tasks), if (connected()) 'active' else 'inactive'
 			)),
-		log = function(format, ...) message(
-			'[', format(Sys.time()), '] ',
-			sprintf(format, ...)
-		),
 		initialize = function(host, port) {
 			"Connects to the pool. 'host' must be a string specifying
 			the address of the pool server. 'port' must be a valid TCP
@@ -70,7 +60,7 @@ mPoolClient <- setRefClass('PoolClient',
 			.self$port <- port
 			.self$socket <- NULL
 			.self$tasks <- list()
-			if (!try_connect(host, port))
+			if (!try_connect())
 				stop("Initial connection attempt failed")
 		},
 		connected = function() !is.null(socket),
@@ -103,8 +93,8 @@ mPoolClient <- setRefClass('PoolClient',
 			"Precondition: connection established. Tries to send the
 			'payload' to the pool. Returns TRUE if sending succeeded.
 			Otherwise disconnects and returns FALSE."
+			stopifnot(connected())
 			tryCatch({
-				stopifnot(connected())
 				while (!socketSelect(list(socket), TRUE)) {}
 				serialize(payload, socket)
 				TRUE
@@ -118,8 +108,8 @@ mPoolClient <- setRefClass('PoolClient',
 			message from the pool. Returns a one-element list containing
 			the message if succeeded. Otherwise disconnects and returns
 			NULL."
+			stopifnot(connected())
 			tryCatch({
-				stopifnot(connected())
 				while (!socketSelect(list(socket))) {}
 				ret <- unserialize(socket)
 				list(ret)
@@ -137,7 +127,7 @@ mPoolClient <- setRefClass('PoolClient',
 			val <- recv()
 			if (is.null(val)) return(NULL) # disconnected
 			if (identical(val[[1]]$type, type)) {
-				val
+				val[[1]]
 			} else {
 				log(
 					'protocol error! expected %s, got %s',
@@ -148,19 +138,12 @@ mPoolClient <- setRefClass('PoolClient',
 			}
 		},
 		do_submit_one = function(tag, fun, args) {
-			"Preconditions: connection established, 'tag' must not be
-			already present among submitted tasks. Tries to send a task
+			"Preconditions: connection established. Tries to send a task
 			to run do.call(fun, args) to the pool. Returns TRUE if
 			succeeded. Otherwise disconnects and returns NULL."
-			stopifnot(
-				connected(),
-				`Must not submit an already submitted tag` = all(vapply(
-					tasks, function(task, tag) !identical(tag, task$tag),
-					FALSE, tag
-				))
-			)
+			stopifnot(connected())
 			send(list(type = 'REQUEST')) &&
-			!is.null(expect('PROCEED')) &&
+			!is.null(expect('OK')) &&
 			send(list(
 				type = 'EXEC', tag = tag, fun = fun, args = args
 			)) &&
@@ -176,20 +159,36 @@ mPoolClient <- setRefClass('PoolClient',
 			if (!try_connect()) next
 			for (task in tasks)
 				if (!do_submit_one(task$tag, task$fun, task$args))
-					next
-			break
+					break
+			# if not connected, last do_submit_one() must have failed
+			if (connected()) break
 		},
 		submit = function(tag, fun, args) {
-			"Puts the task in the queue and tries to submit it to the
-			pool. Returns after successfully submitting the task,
-			possibly reconnecting (and resubmitting everything) in the
-			process."
+			"Precondition: 'tag' must not be already present among
+			submitted tasks. Puts the task in the queue and tries to
+			submit it to the pool. Returns after successfully submitting
+			the task, possibly reconnecting (and resubmitting
+			everything) in the process."
+			stopifnot(
+				`Must not submit an already submitted tag` = all(vapply(
+					tasks, function(task, tag) !identical(tag, task$tag),
+					FALSE, tag
+				))
+			)
 			.self$tasks <- c(.self$tasks, list(
 				list(tag = tag, fun = fun, args = args)
 			))
 			if (connected() && do_submit_one(tag, fun, args)) return()
 			# disconnected! start from scratch
 			reconnect_and_resubmit()
+		},
+		halt = function() {
+			"Sends a message to the pool to stop all nodes and cease
+			operations."
+			repeat {
+				if (connected() && send(list(type = 'DONE'))) return()
+				try_connect()
+			}
 		},
 		get_result = function() {
 			"Precondition: must have previously submitted a task.
@@ -207,7 +206,7 @@ mPoolClient <- setRefClass('PoolClient',
 				if (
 					connected() &&
 					send(list(type = 'RECEIVE')) &&
-					!is.null(ret <- do_get_one_result())
+					!is.null(ret <- expect('VALUE'))
 				) break
 				reconnect_and_resubmit()
 			}
@@ -225,56 +224,6 @@ mPoolClient <- setRefClass('PoolClient',
 	state = state
 ), class = 'nodepool_node')
 
-# [un]serialize() has a tentency to fail without an explanation.
-# We might avoid a timeout by select()ing first.
-.maybe_serialize <- function(con, data) tryCatch({
-	socketSelect(list(con), TRUE)
-	serialize(data, con)
-	TRUE
-}, error = function(e) FALSE)
-.maybe_unserialize <- function(con) tryCatch({
-	socketSelect(list(con))
-	list(TRUE, unserialize(con))
-}, error = function(e) list(FALSE))
-
-# Establish the connection and submit all pending tasks
-.reset_client <- function(state, why) tryCatch({
-	message(format(Sys.time()), ': ', why, ', trying to restore')
-	# If the user had close()d the connection, the following close()
-	# will keep failing indefinitely. Catch the (unlikely but possible)
-	# failure and try to make progress with a new connection.
-	if (!is.null(state$conn)) try(close(state$conn))
-	state$available <- FALSE
-	state$conn <- NULL
-	state$conn <- .do_connect(state$host, state$port)
-	# FIXME: when resubmitting while resetting, these transfers go out unconfirmed
-	# TODO: rewrite as a queue of unsent tasks and a function make_progress()
-	for (task in state$byindex)
-		if (!is.null(task) && !isTRUE(task$complete) && !.maybe_serialize(state$conn, task$task))
-			return(FALSE)
-	TRUE
-}, error = function(e) FALSE)
-
-.retry_serialize <- function(state, data) {
-	while (!.maybe_serialize(state$conn, data))
-		while (!.reset_client(state, 'failed to send')) {}
-}
-
-.retry_unserialize <- function(state) repeat {
-	ret <- .maybe_unserialize(state$conn)
-	if (ret[[1]]) return(ret[[2]])
-	while (!.reset_client(state, 'failed to receive')) {}
-}
-
-.submitOne <- function(state, data) {
-	# Wait until pool is able to handle the task
-	if (!state$available) {
-		.retry_serialize(state, list(type = 'REQUEST'))
-		while (!state$available) .recvOne(state)
-	}
-	.retry_serialize(state, data)
-	state$available <- FALSE
-}
 
 .warnedOnce <- new.env(parent = emptyenv())
 
@@ -293,47 +242,39 @@ sendData.nodepool_node <- function(node, data) {
 		)
 	}
 
-	if (identical(data$type, 'EXEC')) {
-		# Since the results may arrive out of order, mark every job with
-		# the index of the node it has been submitted against.
-		orig_tag <- data$data$tag
-		data$data$tag <- node$index
-		node$state$byindex[[node$index]] <- list(
-			tag = orig_tag,
-			complete = FALSE,
-			value = NULL,
-			task = data
-		)
-		.submitOne(node$state, data)
-	} else .retry_serialize(node$state, data)
+	stopifnot(identical(data$type, 'EXEC'))
+	# Since the results may arrive out of order, mark every job with
+	# the index of the node it has been submitted against.
+	orig_tag <- data$data$tag
+	data$data$tag <- node$index
+	node$state$byindex[[node$index]] <- list(
+		tag = orig_tag,
+		complete = FALSE,
+		value = NULL,
+		task = data
+	)
+	node$state$conn$submit(
+		node$index, data$data$fun, data$data$args
+	)
 }
 
 # Read one response. Look up and repair the tag. Return.
 .recvOne <- function(state) {
-	value <- .retry_unserialize(state)
+	value <- state$conn$get_result()
 
-	switch(value$type,
-		VALUE = {
-			stopifnot(
-				'Internal error: received a job result without a tag' = !is.null(value$tag),
-				'Internal error: received a job result with an invalid tag' =
-					is.numeric(value$tag) && length(value$tag) == 1 &&
-					round(value$tag) == value$tag
-			)
-
-			index <- value$tag
-			value$tag <- state$byindex[[index]]$tag
-			state$byindex[[index]]$value <- value
-			state$byindex[[index]]$complete <- TRUE
-
-			index
-		},
-		PROCEED = {
-			state$available <- TRUE
-
-			invisible()
-		}
+	stopifnot(
+		'Internal error: received a job result without a tag' = !is.null(value$tag),
+		'Internal error: received a job result with an invalid tag' =
+			is.numeric(value$tag) && length(value$tag) == 1 &&
+			round(value$tag) == value$tag
 	)
+
+	index <- value$tag
+	value$tag <- state$byindex[[index]]$tag
+	state$byindex[[index]]$value <- value
+	state$byindex[[index]]$complete <- TRUE
+
+	index
 }
 
 recvData.nodepool_node <- function(node) {
@@ -362,35 +303,21 @@ recvOneData.nodepool_cluster <- function(cl) repeat {
 
 stopCluster.nodepool_cluster <- function(cl, ...) {
 	# NOTE: this makes it impossible to subclass nodes
-	sendData.nodepool_node(cl[[1]], list(type = 'DONE'))
+	cl[[1]]$state$conn$halt()
 	close(cl)
 }
 
 close.nodepool_cluster <- function(con, ...) {
-	if (!is.null(con[[1]]$state$conn)) close(con[[1]]$state$conn)
-	con[[1]]$state$conn <- NULL
-}
-
-.do_connect <- function(host, port) {
-	conn <- socketConnection(host, port, blocking = TRUE, open = 'a+b')
-	# This is the only place where we do unprotected serialize().
-	# It's better to let a fresh connection fail right away.
-	serialize(
-		list(type = 'HELO', format = if (getRversion() < '3.5.0') 2 else 3),
-		conn
-	)
-	conn
+	if (con[[1]]$state$conn$connected())
+		con[[1]]$state$conn$disconnect()
 }
 
 pool_connect <- function(host, port, length = 0x80) {
-	conn <- .do_connect(host, port)
+	conn <- mPoolClient(host, port)
 	state <- list2env(
 		list(
 			conn = conn,
-			byindex = vector('list', length),
-			host = host,
-			port = port,
-			available = FALSE
+			byindex = vector('list', length)
 		),
 		parent = emptyenv()
 	)
@@ -403,15 +330,14 @@ pool_connect <- function(host, port, length = 0x80) {
 }
 
 print.nodepool_cluster <- function(x, ...) {
+	x[[1]]$state$conn$show()
 	cat(
-		'<Connection to the pool server at ',
-		x[[1]]$state$host, ':', x[[1]]$state$port,
 		if (!is.null(pid <- attr(x, 'pid'))) paste0(' (PID ', pid, ')'),
 		if ((nodes <- length(attr(x, 'nodepids'))) > 0)
 			paste(' with', nodes, 'local node[s]'),
-		if (inherits(try(isOpen(x[[1]]$state$conn), TRUE), 'try-error'))
+		if (!x[[1]]$state$conn$connected())
 			', currently closed',
-		'>\n', sep = ''
+		'\n', sep = ''
 	)
 	invisible(x)
 }
