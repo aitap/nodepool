@@ -3,6 +3,16 @@ log <- function(format, ...) message(
 	sprintf(format, ...)
 )
 
+compressed_task_fun <- function(type) {
+	force(type)
+	function(payload) {
+		payload <- unserialize(memDecompress(payload, type))
+		payload <- do.call(payload$fun, payload$args, TRUE)
+		payload <- serialize(payload, NULL, version = 2)
+		memCompress(payload, type)
+	}
+}
+
 # The client protocol
 # ===================
 # All requests are initiated by the client and answered by the pool.
@@ -37,7 +47,8 @@ mPoolClient <- setRefClass('PoolClient',
 		host = 'character',
 		port = 'numeric',
 		socket = 'optional_sockconn',
-		tasks = 'list'
+		tasks = 'list',
+		compress = 'character'
 	),
 	methods = list(
 		show = function()
@@ -45,7 +56,7 @@ mPoolClient <- setRefClass('PoolClient',
 				"Connection to pool at %s:%d, %d task(s) in queue, currently %s\n",
 				host, port, length(tasks), if (connected()) 'active' else 'inactive'
 			)),
-		initialize = function(host, port) {
+		initialize = function(host, port, compress = 'none') {
 			"Connects to the pool. 'host' must be a string specifying
 			the address of the pool server. 'port' must be a valid TCP
 			port number. If the first attempt to connect and exchange
@@ -54,12 +65,14 @@ mPoolClient <- setRefClass('PoolClient',
 			stopifnot(
 				is.character(host), length(host) == 1,
 				is.numeric(port), length(port) == 1,
-				port %% 1 == 0, port %in% 1:65535
+				port %% 1 == 0, port %in% 1:65535,
+				compress %in% c('none', 'gzip', 'bzip2', 'xz')
 			)
 			.self$host <- host
 			.self$port <- port
 			.self$socket <- NULL
 			.self$tasks <- list()
+			.self$compress <- compress
 			if (!try_connect())
 				stop("Initial connection attempt failed")
 		},
@@ -175,6 +188,17 @@ mPoolClient <- setRefClass('PoolClient',
 					FALSE, tag
 				))
 			)
+			if (compress != 'none') {
+				args <- list(memCompress(
+					serialize(
+						list(fun = fun, args = args),
+						NULL,
+						version = 2
+					),
+					compress
+				))
+				fun <- compressed_task_fun(compress)
+			}
 			.self$tasks <- c(.self$tasks, list(
 				list(tag = tag, fun = fun, args = args)
 			))
@@ -214,6 +238,10 @@ mPoolClient <- setRefClass('PoolClient',
 				function(task) !identical(task$tag, ret$tag),
 				.self$tasks
 			)
+			if (compress != 'none' && ret$success)
+				ret$value <- unserialize(
+					memDecompress(ret$value, compress)
+				)
 			ret
 		}
 	)
@@ -312,8 +340,8 @@ close.nodepool_cluster <- function(con, ...) {
 		con[[1]]$state$conn$disconnect()
 }
 
-pool_connect <- function(host, port, length = 0x80) {
-	conn <- mPoolClient(host, port)
+pool_connect <- function(host, port, length = 0x80, compress = 'none') {
+	conn <- mPoolClient(host, port, compress)
 	state <- list2env(
 		list(
 			conn = conn,

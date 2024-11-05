@@ -9,7 +9,7 @@
   \code{\link{run_pool}} or stop the pool.
 }
 \usage{
-  pool_connect(host, port, length = 128)
+  pool_connect(host, port, length = 128, compress = 'none')
   \method{print}{nodepool_cluster}(x, \dots)
   \method{close}{nodepool_cluster}(con, \dots)
   \method{stopCluster}{nodepool_cluster}(cl, \dots)
@@ -30,6 +30,14 @@
     number of tasks evaluated at the same time. There is probably no
     benefit to setting it higher than the maximal total number of nodes
     that can connect to the pool.
+  }
+  \item{compress}{
+    The type of compression applied to tasks and results. If not
+    \sQuote{none}, must be one of \sQuote{gzip}, \sQuote{bzip2},
+    \sQuote{xz} to \code{\link[base]{serialize}} and then
+    \code{\link[base]{memCompress}} the potentially large objects before
+    transmission and then \code{\link[base]{memDecompress}} and
+    \code{\link[base]{unserialize}} them afterwards.
   }
   \item{\dots}{
     Ignored.
