@@ -206,6 +206,14 @@ mPoolClient <- setRefClass('PoolClient',
 			# disconnected! start from scratch
 			reconnect_and_resubmit()
 		},
+		abandon_tasks = function() {
+			"Clears the list of pending tasks and disconnects to signal
+			the server to do the same."
+			# can't introduce a command to do that because we may have
+			# already sent a command and may be waiting for a reply
+			.self$tasks <- list()
+			if (connected()) disconnect()
+		},
 		halt = function() {
 			"Sends a message to the pool to stop all nodes and cease
 			operations."
@@ -252,11 +260,13 @@ mPoolClient <- setRefClass('PoolClient',
 	state = state
 ), class = 'nodepool_node')
 
+.abandon_tasks <- function(state) {
+	state$conn$abandon_tasks()
+	state$byindex <- vector('list', length(state$byindex))
+}
 
 .warnedOnce <- new.env(parent = emptyenv())
-
-# Remember the index of the node corresponding to this task
-sendData.nodepool_node <- function(node, data) {
+sendData.nodepool_node <- function(node, data) withCallingHandlers({
 	if (
 		sys.nframe() >= 4 &&
 		identical(sys.function(-4), parallel::clusterCall) &&
@@ -284,7 +294,10 @@ sendData.nodepool_node <- function(node, data) {
 	node$state$conn$submit(
 		node$index, data$data$fun, data$data$args
 	)
-}
+},
+	interrupt = function(e) .abandon_tasks(node$state),
+	error     = function(e) .abandon_tasks(node$state)
+)
 
 # Read one response. Look up and repair the tag. Return.
 .recvOne <- function(state) {
@@ -305,7 +318,7 @@ sendData.nodepool_node <- function(node, data) {
 	index
 }
 
-recvData.nodepool_node <- function(node) {
+recvData.nodepool_node <- function(node) withCallingHandlers({
 	# Receive and remember responses as they come
 	while (!node$state$byindex[[node$index]]$complete)
 		.recvOne(node$state)
@@ -313,9 +326,12 @@ recvData.nodepool_node <- function(node) {
 	value <- node$state$byindex[[node$index]]$value
 	on.exit(node$state$byindex[node$index] <- list(NULL))
 	value
-}
+},
+	interrupt = function(e) .abandon_tasks(node$state),
+	error     = function(e) .abandon_tasks(node$state)
+)
 
-recvOneData.nodepool_cluster <- function(cl) repeat {
+recvOneData.nodepool_cluster <- function(cl) withCallingHandlers(repeat {
 	# anything already received?
 	complete <- vapply(cl[[1]]$state$byindex, function(x) isTRUE(x$complete), FALSE)
 	if (any(complete)) {
@@ -327,7 +343,10 @@ recvOneData.nodepool_cluster <- function(cl) repeat {
 	}
 	# try to receive more
 	.recvOne(cl[[1]]$state)
-}
+},
+	interrupt = function(e) .abandon_tasks(cl[[1]]$state),
+	error     = function(e) .abandon_tasks(cl[[1]]$state)
+)
 
 stopCluster.nodepool_cluster <- function(cl, ...) {
 	# NOTE: this makes it impossible to subclass nodes
@@ -336,8 +355,7 @@ stopCluster.nodepool_cluster <- function(cl, ...) {
 }
 
 close.nodepool_cluster <- function(con, ...) {
-	if (con[[1]]$state$conn$connected())
-		con[[1]]$state$conn$disconnect()
+	.abandon_tasks(con[[1]]$state)
 }
 
 pool_connect <- function(host, port, length = 0x80, compress = 'none') {
